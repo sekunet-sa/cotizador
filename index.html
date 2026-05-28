@@ -117,9 +117,9 @@ tbody tr{border-bottom:1px solid var(--border);transition:background .12s;}
 tbody tr:last-child{border-bottom:none;}
 tbody tr:hover{background:var(--surface2);}
 tbody td{padding:.6rem .9rem;vertical-align:middle;}
-.td-model{font-weight:500;max-width:190px;}
+.td-model{font-weight:500;max-width:220px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .td-model small{display:block;font-size:.66rem;color:var(--muted);margin-top:1px;font-weight:400;}
-.qty-inp{width:54px;text-align:center;padding:.26rem .36rem;font-size:.79rem;font-family:'DM Mono',monospace;}
+.qty-inp{width:42px;text-align:center;padding:.18rem .22rem;font-size:.75rem;font-family:'DM Mono',monospace;}
 .tv{color:var(--success);font-weight:700;font-family:'DM Mono',monospace;}
 .tt{color:var(--accent2);font-weight:700;font-family:'DM Mono',monospace;}
 .btn-del{background:none;border:none;color:var(--muted);cursor:pointer;font-size:.86rem;padding:3px 6px;border-radius:6px;transition:all .13s;}
@@ -310,11 +310,28 @@ textarea{resize:vertical;min-height:56px;font-size:.82rem;}
   font-family:inherit;font-size:.72rem;transition:all .15s;
 }
 .session-bar button:hover{border-color:#e05c0a;color:#e05c0a;}
+
+#toast{position:fixed;bottom:1.5rem;right:1.5rem;background:#22c55e;color:#fff;
+  padding:.6rem 1.2rem;border-radius:10px;font-size:.82rem;font-weight:600;
+  box-shadow:0 4px 16px rgba(0,0,0,.35);opacity:0;transform:translateY(10px);
+  transition:all .3s;z-index:9999;pointer-events:none;}
+#toast.visible{opacity:1;transform:translateY(0);}
+
+@media print {
+  .left,.header,.hdr-right,.btn-del,.btn,.theme-toggle,#loginOverlay,#toast,.session-bar{display:none!important;}
+  .layout{display:block!important;}
+  .right{padding:1rem!important;max-height:none!important;overflow:visible!important;}
+  body{background:#fff!important;color:#000!important;}
+  #printHeader{display:flex!important;}
+  .tw,.totals-card,.delivery-box,.quote-footer{box-shadow:none!important;border-color:#ddd!important;}
+  [data-theme]{--bg:#fff;--surface:#fff;--surface2:#f5f5f5;--border:#ddd;--text:#111;--muted:#555;--success:#166534;--blue:#1e40af;}
+}
 </style>
 </head>
 <body>
 
 <!-- ══ LOGIN ══════════════════════════════════════════════ -->
+<div id="toast"></div>
 <div id="loginOverlay">
   <div class="login-box">
     <div class="login-logo">
@@ -362,7 +379,8 @@ textarea{resize:vertical;min-height:56px;font-size:.82rem;}
     <button class="theme-toggle" onclick="toggleTheme()" id="themeBtn" title="Cambiar tema">🌙</button>
     <button class="btn btn-ghost btn-sm" onclick="clearAll()">🗑 Limpiar</button>
     <button class="btn btn-ghost btn-sm" onclick="exportCSV()">📊 CSV</button>
-    <button class="btn btn-ghost btn-sm" onclick="window.print()">🖨 Imprimir</button>
+    <button class="btn btn-ghost btn-sm" onclick="generarPDF()">📄 PDF</button>
+    <button class="btn btn-ghost btn-sm" onclick="printQuote()">🖨 Imprimir</button>
     <button class="btn btn-ghost btn-sm" onclick="openAdmin()">⚙️ Admin</button>
   </div>
 </div>
@@ -606,10 +624,6 @@ textarea{resize:vertical;min-height:56px;font-size:.82rem;}
 
   <div class="totals-card">
     <div class="totals-grid">
-      <div class="tot-item c-green">
-        <span class="tot-label">Total Cotización</span>
-        <span class="tot-val" id="totalVenta">$0.00</span>
-      </div>
       <div class="tot-item c-blue">
         <span class="tot-label">Unidades</span>
         <span class="tot-val" id="totalUnits">0</span>
@@ -617,6 +631,21 @@ textarea{resize:vertical;min-height:56px;font-size:.82rem;}
       <div class="tot-item">
         <span class="tot-label">Líneas</span>
         <span class="tot-val" style="color:var(--muted);font-size:.88rem;" id="totalLines">0</span>
+      </div>
+      <div class="tot-item">
+        <span class="tot-label">IVA (13%)</span>
+        <span class="tot-val" style="color:var(--muted);font-size:.95rem;" id="totalIVA">$0.00</span>
+      </div>
+    </div>
+    <hr class="dv">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.5rem;margin-bottom:.6rem;">
+      <div>
+        <div style="font-size:.63rem;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);font-weight:700;margin-bottom:2px;">Subtotal</div>
+        <div style="font-family:'DM Mono',monospace;font-size:.95rem;color:var(--text);" id="totalSubtotal">$0.00</div>
+      </div>
+      <div style="text-align:right;">
+        <div style="font-size:.63rem;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);font-weight:700;margin-bottom:2px;">Total con IVA 13%</div>
+        <div style="font-family:'DM Mono',monospace;font-size:1.35rem;font-weight:800;color:var(--success);" id="totalConIVA">$0.00</div>
       </div>
     </div>
     <hr class="dv">
@@ -693,6 +722,7 @@ textarea{resize:vertical;min-height:56px;font-size:.82rem;}
     <div class="fnote">⚠️ Cambios aplican en tiempo real. Estos factores incluyen aduanas, flete y gastos operativos.</div></div>
     <div class="save-bar">
       <button class="btn btn-ghost btn-sm" onclick="closeAdmin()">Cerrar</button>
+      <button class="btn btn-sm" style="background:rgba(230,60,47,.1);color:var(--accent);border:1px solid rgba(230,60,47,.2);" onclick="borrarConfig()">🔄 Restablecer</button>
       <button class="btn btn-green btn-sm" onclick="applyAdmin()">✓ Aplicar cambios</button>
     </div></div>
   </div>
@@ -931,7 +961,9 @@ function renderTable(){
   const empty=document.getElementById('emptyState');
   if(!quoteItems.length){
     tbody.innerHTML='';empty.style.display='';
-    document.getElementById('totalVenta').textContent='$0.00';
+    document.getElementById('totalSubtotal').textContent='$0.00';
+    document.getElementById('totalIVA').textContent='$0.00';
+    document.getElementById('totalConIVA').textContent='$0.00';
     document.getElementById('totalUnits').textContent='0';
     document.getElementById('totalLines').textContent='0';
     document.getElementById('altCurrency').textContent='';
@@ -963,11 +995,15 @@ function renderTable(){
   }).join('');
   const cur=document.getElementById('currency').value;
   const rate=parseFloat(document.getElementById('exchangeRate').value)||530;
-  document.getElementById('totalVenta').textContent=fmt(sumV);
+  const iva = sumV * 0.13;
+  const totalFinal = sumV + iva;
+  document.getElementById('totalSubtotal').textContent=fmt(sumV);
+  document.getElementById('totalIVA').textContent=fmt(iva);
+  document.getElementById('totalConIVA').textContent=fmt(totalFinal);
   document.getElementById('totalUnits').textContent=units;
   document.getElementById('totalLines').textContent=quoteItems.length;
   document.getElementById('altCurrency').textContent=cur==='USD'
-    ?'≈ ₡'+Math.round(sumV*rate).toLocaleString('es-CR')
+    ?'≈ ₡'+Math.round(totalFinal*rate).toLocaleString('es-CR')
     :'≈ $'+sumV.toFixed(2)+' USD';
   updateDelivery();
 }
@@ -1002,6 +1038,7 @@ function exportCSV(){
     }),
     [''],['Total','','','','','','',quoteItems.reduce((s,i)=>s+i.qty,0),'',
       quoteItems.reduce((s,i)=>s+getSalePrice(i)*i.qty,0).toFixed(2)],
+    (()=>{const sub=quoteItems.reduce((s,i)=>s+getSalePrice(i)*i.qty,0);return ['','','','','','','','','','Subtotal',sub.toFixed(2),'IVA 13%',(sub*0.13).toFixed(2),'Total con IVA',(sub*1.13).toFixed(2)];})(),
     [''],['Notas',nt],
     [''],['www.sekunet.com','Distribuidor Mayorista Hikvision / PDS']
   ];
@@ -1009,6 +1046,8 @@ function exportCSV(){
   const a=document.createElement('a');
   a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8;'}));
   a.download=qId+'_'+cl.replace(/\s/g,'_')+'.csv';a.click();
+  registrarExportacion('CSV');
+  registrarCotizacion();
 }
 
 // ADMIN
@@ -1041,6 +1080,7 @@ function renderAdmin(){
     <div id="admBody"></div>
     <div class="save-bar">
       <button class="btn btn-ghost btn-sm" onclick="closeAdmin()">Cerrar</button>
+      <button class="btn btn-sm" style="background:rgba(230,60,47,.1);color:var(--accent);border:1px solid rgba(230,60,47,.2);" onclick="borrarConfig()">🔄 Restablecer</button>
       <button class="btn btn-green btn-sm" onclick="applyAdmin()">✓ Aplicar cambios</button>
     </div>`;
   renderAdminBody();
@@ -1198,6 +1238,7 @@ function guardarUsuario(){
   }
   cancelarFormUser();
   renderTablaUsuarios();
+  guardarConfig();
 }
 
 function eliminarUsuario(idx){
@@ -1208,6 +1249,7 @@ function eliminarUsuario(idx){
   if(!confirm('¿Eliminar al asesor "' + USUARIOS[idx].nombre + '"?')) return;
   USUARIOS.splice(idx, 1);
   renderTablaUsuarios();
+  guardarConfig();
 }
 
 function renderFactors(body){
@@ -1247,7 +1289,7 @@ function renderMargins(body){
     <div class="global-margin">
       <label>🌐 Margen global (base para todo lo que no tenga margen específico)</label>
       <input type="number" step="0.5" min="0" max="200" value="${MARGINS.global}"
-        onchange="MARGINS.global=parseFloat(this.value)||0;renderTable();"/>
+        onchange="MARGINS.global=parseFloat(this.value)||0;renderTable();guardarConfig();"/>
       <span class="margin-pct">%</span>
     </div>
     <div class="margin-grid">
@@ -1258,7 +1300,7 @@ function renderMargins(body){
           <input type="number" step="0.5" min="0" max="200"
             placeholder="${MARGINS.global}%"
             value="${MARGINS.byList.distribucion!==null?MARGINS.byList.distribucion:''}"
-            onchange="MARGINS.byList.distribucion=this.value===''?null:parseFloat(this.value);renderTable();"/>
+            onchange="MARGINS.byList.distribucion=this.value===''?null:parseFloat(this.value);renderTable();guardarConfig();"/>
           <span class="margin-pct">%</span>
         </div>
         <div class="margin-row-item">
@@ -1266,7 +1308,7 @@ function renderMargins(body){
           <input type="number" step="0.5" min="0" max="200"
             placeholder="${MARGINS.global}%"
             value="${MARGINS.byList.proyecto!==null?MARGINS.byList.proyecto:''}"
-            onchange="MARGINS.byList.proyecto=this.value===''?null:parseFloat(this.value);renderTable();"/>
+            onchange="MARGINS.byList.proyecto=this.value===''?null:parseFloat(this.value);renderTable();guardarConfig();"/>
           <span class="margin-pct">%</span>
         </div>
         <div class="fnote" style="margin-top:.5rem;">Vacío = usa el margen global.</div>
@@ -1377,7 +1419,7 @@ function renderPriceResults(){
   </table></div>`;
 }
 
-function applyAdmin(){renderTable();renderResults();}
+function applyAdmin(){renderTable();renderResults();guardarConfig();mostrarToast("✅ Cambios guardados");}
 function checkPwd(){
   if(document.getElementById('pwdInput').value===ADMIN_PWD){adminUnlocked=true;renderAdmin();}
   else document.getElementById('pwdErr').textContent='Contraseña incorrecta';
@@ -1395,10 +1437,15 @@ renderTable();
 // CONFIGURACIÓN DE USUARIOS
 // Admin: agrega o quita asesores aquí
 // ══════════════════════════════════════════════════════════
-const USUARIOS = [
-  { usuario: 'asesor1',   clave: 'Sekunet2025!', nombre: 'Asesor 1' },
-  { usuario: 'asesor2',   clave: 'Sekunet2025!', nombre: 'Asesor 2' },
-  { usuario: 'asesor3',   clave: 'Sekunet2025!', nombre: 'Asesor 3' },
+let USUARIOS = [
+  { usuario: 'cchavarria',   clave: 'Sekunet2026', nombre: 'Carolina Chavarria' },
+  { usuario: 'jssanchez',   clave: 'Sekunet2026', nombre: 'Joaquin Swirsgde' },
+  { usuario: 'rdiaz',   clave: 'Sekunet2026', nombre: 'Roberto Diaz' },
+  { usuario: 'fperozo',   clave: 'Sekunet2026', nombre: 'Fabiana Perozo' },
+  { usuario: 'scastro',   clave: 'Sekunet2026', nombre: 'Sharon Castro' },
+  { usuario: 'nezpinoza',   clave: 'Sekunet2026', nombre: 'Nicole Espinoza' },
+  { usuario: 'ezambrano',   clave: 'Sekunet2026', nombre: 'Eliza Zambrano' },
+  { usuario: 'mcastro',   clave: 'Sekunet2026', nombre: 'Mariano Castro' },
   { usuario: 'admin',     clave: 'AdminSek2025!', nombre: 'Administrador' },
 ];
 
@@ -1406,11 +1453,103 @@ const USUARIOS = [
 // URL DEL FLOW DE POWER AUTOMATE
 // Reemplaza esta URL con la que genera tu Flow
 // ══════════════════════════════════════════════════════════
-const FLOW_URL = 'PEGAR_URL_DEL_FLOW_AQUI';
+const REGISTRO_URL = 'https://script.google.com/macros/s/AKfycbwpFwNE8H3P6cB3zqxzUcWCKEB_JQsPG75HBGUXN_I9Xnusc-lc5km0_zwZZFEabQKB5A/exec';
 
 // ── ESTADO DE SESIÓN ──────────────────────────────────────
 let usuarioActivo = null;
 let horaIngreso = null;
+
+function hacerLogin() {
+  const user = document.getElementById('loginUser').value.trim().toLowerCase();
+  const pass = document.getElementById('loginPass').value;
+  const err  = document.getElementById('loginErr');
+  const btn  = document.getElementById('loginBtn');
+  const spin = document.getElementById('loginSpinner');
+
+  if (!user || !pass) {
+    err.textContent = 'Ingresa tu usuario y contraseña';
+    return;
+  }
+
+  // Buscar usuario
+  const encontrado = USUARIOS.find(u => u.usuario.toLowerCase() === user && u.clave === pass);
+  if (!encontrado) {
+    err.textContent = 'Usuario o contraseña incorrectos';
+    document.getElementById('loginPass').value = '';
+    document.getElementById('loginPass').focus();
+    return;
+  }
+
+  // Login exitoso — mostrar spinner
+  err.textContent = '';
+  btn.disabled = true;
+  spin.style.display = 'block';
+  btn.style.display = 'none';
+
+  usuarioActivo = encontrado;
+  horaIngreso = new Date();
+
+  // Registrar en Power Automate → Excel SharePoint
+  registrarAcceso(encontrado.nombre, horaIngreso).finally(() => {
+    // Mostrar app siempre, aunque falle el registro
+    document.getElementById('loginOverlay').classList.add('oculto');
+    document.getElementById('sessionBar').style.display = 'flex';
+    document.getElementById('sessionUser').textContent = encontrado.nombre;
+    document.getElementById('sessionTime').textContent =
+      'Ingreso: ' + horaIngreso.toLocaleString('es-CR', {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
+
+    // Pre-llenar el campo asesor
+    const campoAsesor = document.getElementById('clientContact');
+    if (campoAsesor && !campoAsesor.value) campoAsesor.value = encontrado.nombre;
+
+    spin.style.display = 'none';
+    btn.disabled = false;
+    btn.style.display = 'block';
+  });
+}
+
+async function enviarRegistro(datos) {
+  try {
+    await fetch(REGISTRO_URL, {
+      method: 'POST', mode: 'no-cors',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(datos)
+    });
+  } catch(e) { console.warn('Registro omitido:', e.message); }
+}
+async function registrarAcceso(nombre, fecha) {
+  await enviarRegistro({
+    tipo:'acceso', asesor:nombre,
+    fecha: fecha.toLocaleDateString('es-CR',{day:'2-digit',month:'2-digit',year:'numeric'}),
+    hora:  fecha.toLocaleTimeString('es-CR',{hour:'2-digit',minute:'2-digit',second:'2-digit'}),
+    fechaHora: fecha.toISOString()
+  });
+}
+function registrarCotizacion() {
+  if (!usuarioActivo) return;
+  const sub = quoteItems.reduce((s,i)=>s+getSalePrice(i)*i.qty,0);
+  enviarRegistro({
+    tipo:'cotizacion', asesor:usuarioActivo.nombre,
+    cliente:  document.getElementById('clientName')?.value||'',
+    proyecto: document.getElementById('clientRef')?.value||'',
+    ruta:  ({aereo:'Aéreo',maritimo:'Marítimo',terrestre:'Terrestre'})[route]||route,
+    lista: ({distribucion:'Distribución',proyecto:'Proyecto'})[tipo]||tipo,
+    subtotal: sub.toFixed(2),
+    iva: (sub*0.13).toFixed(2),
+    total: (sub*1.13).toFixed(2),
+    fecha: new Date().toLocaleDateString('es-CR',{day:'2-digit',month:'2-digit',year:'numeric'})
+  });
+}
+function registrarExportacion(tipoExport) {
+  if (!usuarioActivo) return;
+  const sub = quoteItems.reduce((s,i)=>s+getSalePrice(i)*i.qty,0);
+  enviarRegistro({
+    tipo:'exportacion', asesor:usuarioActivo.nombre, tipoExport,
+    cliente: document.getElementById('clientName')?.value||'',
+    total: (sub*1.13).toFixed(2),
+    fecha: new Date().toLocaleDateString('es-CR',{day:'2-digit',month:'2-digit',year:'numeric'})
+  });
+}
 
 function hacerLogin() {
   const user = document.getElementById('loginUser').value.trim().toLowerCase();
@@ -1500,6 +1639,160 @@ function cerrarSesion() {
 window.addEventListener('load', function() {
   document.getElementById('loginUser').focus();
 });
+</script>
+
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<script>
+// ══════════════════════════════════════════════════════════
+// TOAST
+// ══════════════════════════════════════════════════════════
+function mostrarToast(msg, color) {
+  const t = document.getElementById('toast');
+  if (!t) return;
+  t.textContent = msg;
+  t.style.background = color || '#22c55e';
+  t.classList.add('visible');
+  setTimeout(() => t.classList.remove('visible'), 2500);
+}
+
+// ══════════════════════════════════════════════════════════
+// LOCAL STORAGE
+// ══════════════════════════════════════════════════════════
+const LS_KEY = 'sekunet_config_v1';
+
+function guardarConfig() {
+  try {
+    localStorage.setItem(LS_KEY, JSON.stringify({
+      factores: F,
+      margenes: { global: MARGINS.global, byList: MARGINS.byList, byCat: MARGINS.byCat },
+      usuarios: USUARIOS,
+      tiempos: DELIVERY
+    }));
+  } catch(e) { console.warn('localStorage error:', e.message); }
+}
+
+function cargarConfig() {
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    if (!raw) return;
+    const cfg = JSON.parse(raw);
+
+    // Factores
+    if (cfg.factores) {
+      ['distribucion','proyecto'].forEach(lista => {
+        if (cfg.factores[lista]) {
+          ['aereo','maritimo','terrestre'].forEach(r => {
+            if (cfg.factores[lista][r]) F[lista][r] = cfg.factores[lista][r];
+          });
+        }
+      });
+    }
+
+    // Márgenes
+    if (cfg.margenes) {
+      if (cfg.margenes.global != null) MARGINS.global = cfg.margenes.global;
+      if (cfg.margenes.byList) MARGINS.byList = cfg.margenes.byList;
+      if (cfg.margenes.byCat) Object.assign(MARGINS.byCat, cfg.margenes.byCat);
+    }
+
+    // Usuarios
+    if (cfg.usuarios && cfg.usuarios.length > 0) {
+      USUARIOS.length = 0;
+      cfg.usuarios.forEach(u => USUARIOS.push(u));
+    }
+
+    // Tiempos de entrega
+    if (cfg.tiempos) {
+      ['aereo','maritimo','terrestre'].forEach(r => {
+        if (cfg.tiempos[r]) Object.assign(DELIVERY[r], cfg.tiempos[r]);
+      });
+    }
+  } catch(e) { console.warn('Error cargando config:', e.message); }
+}
+
+function borrarConfig() {
+  if (!confirm('¿Restablecer TODA la configuración a los valores por defecto?\nSe borrarán factores, márgenes, usuarios y tiempos guardados.')) return;
+  localStorage.removeItem(LS_KEY);
+  mostrarToast('🔄 Configuración restablecida', '#e05c0a');
+  setTimeout(() => location.reload(), 1000);
+}
+
+// Cargar al iniciar
+cargarConfig();
+
+// ══════════════════════════════════════════════════════════
+// IMPRIMIR
+// ══════════════════════════════════════════════════════════
+function updatePrintHeader() {
+  const nom  = document.getElementById('clientName')?.value  || '';
+  const proy = document.getElementById('clientRef')?.value   || '';
+  const ases = document.getElementById('clientContact')?.value || '';
+  const phN  = document.getElementById('ph-cliente');
+  const phP  = document.getElementById('ph-proyecto');
+  const phA  = document.getElementById('ph-asesor');
+  const phF  = document.getElementById('ph-fecha');
+  if (phN) phN.textContent = nom || 'Sekunet S.A.';
+  if (phP) phP.textContent = proy ? 'Proyecto: ' + proy : '';
+  if (phA) phA.textContent = ases ? 'Asesor: ' + ases : '';
+  if (phF) phF.textContent = 'Fecha: ' + new Date().toLocaleDateString('es-CR',{day:'2-digit',month:'long',year:'numeric'});
+}
+
+function printQuote() {
+  updatePrintHeader();
+  const phdr = document.getElementById('printHeader');
+  if (phdr) phdr.style.display = 'flex';
+  const right = document.querySelector('.right');
+  const orig = right ? right.style.cssText : '';
+  if (right) { right.style.maxHeight = 'none'; right.style.overflow = 'visible'; }
+  setTimeout(() => {
+    window.print();
+    setTimeout(() => {
+      if (phdr) phdr.style.display = 'none';
+      if (right) right.style.cssText = orig;
+      registrarExportacion('Impresión');
+      registrarCotizacion();
+    }, 800);
+  }, 150);
+}
+
+// ══════════════════════════════════════════════════════════
+// PDF
+// ══════════════════════════════════════════════════════════
+function generarPDF() {
+  if (!quoteItems || !quoteItems.length) { alert('Agrega productos primero'); return; }
+  updatePrintHeader();
+  const nom  = document.getElementById('clientName')?.value  || 'Cliente';
+  const proy = document.getElementById('clientRef')?.value   || '';
+  const qidEl = document.getElementById('qId');
+  const qid  = qidEl ? qidEl.textContent.split(' · ')[0] : 'COT';
+  const fn   = qid + '_' + nom.replace(/\s+/g,'_') + (proy?'_'+proy.replace(/\s+/g,'_'):'') + '.pdf';
+
+  const phdr = document.getElementById('printHeader');
+  if (phdr) phdr.style.display = 'flex';
+
+  const right = document.querySelector('.right');
+  const orig = right ? right.style.cssText : '';
+  if (right) { right.style.maxHeight = 'none'; right.style.overflow = 'visible'; }
+
+  const ocultar = document.querySelectorAll('.left,.header,.hdr-right,.btn-del,.theme-toggle');
+  const origD = [];
+  ocultar.forEach(el => { origD.push(el.style.display); el.style.display = 'none'; });
+
+  html2pdf().set({
+    margin: [10,10,10,10], filename: fn,
+    image: {type:'jpeg', quality:.98},
+    html2canvas: {scale:2, useCORS:true, backgroundColor:'#ffffff'},
+    jsPDF: {unit:'mm', format:'a4', orientation:'portrait'}
+  }).from(document.querySelector('.right')).save().then(() => {
+    if (phdr) phdr.style.display = 'none';
+    if (right) right.style.cssText = orig;
+    ocultar.forEach((el,i) => el.style.display = origD[i]);
+    registrarExportacion('PDF');
+    registrarCotizacion();
+    mostrarToast('📄 PDF descargado');
+  });
+}
 </script>
 
 </body></html>
