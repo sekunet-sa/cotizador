@@ -362,7 +362,8 @@ textarea{resize:vertical;min-height:56px;font-size:.82rem;}
     <button class="theme-toggle" onclick="toggleTheme()" id="themeBtn" title="Cambiar tema">🌙</button>
     <button class="btn btn-ghost btn-sm" onclick="clearAll()">🗑 Limpiar</button>
     <button class="btn btn-ghost btn-sm" onclick="exportCSV()">📊 CSV</button>
-    <button class="btn btn-ghost btn-sm" onclick="window.print()">🖨 Imprimir</button>
+    <button class="btn btn-ghost btn-sm" onclick="printQuote()">🖨 Imprimir</button>
+    <button class="btn btn-ghost btn-sm" onclick="generarPDF()">📄 PDF</button>
     <button class="btn btn-ghost btn-sm" onclick="openAdmin()">⚙️ Admin</button>
   </div>
 </div>
@@ -823,6 +824,8 @@ function setTipo(t){
 });
 function printQuote(){
   updatePrintHeader();
+  registrarExportacion('Impresión');
+  registrarCotizacion();
   // Temporarily remove max-height so all content prints
   const right = document.querySelector('.right');
   const origStyle = right ? right.style.cssText : '';
@@ -1027,6 +1030,8 @@ function exportCSV(){
   const a=document.createElement('a');
   a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8;'}));
   a.download=qId+'_'+cl.replace(/\s/g,'_')+'.csv';a.click();
+  registrarExportacion('CSV');
+  registrarCotizacion();
 }
 
 // ADMIN
@@ -1414,14 +1419,9 @@ renderTable();
 // Admin: agrega o quita asesores aquí
 // ══════════════════════════════════════════════════════════
 const USUARIOS = [
-  { usuario: 'cchavarria',   clave: 'Sekunet2026', nombre: 'Carolina Chavarria' },
-  { usuario: 'jssanchez',   clave: 'Sekunet2026', nombre: 'Joaquin Swirsgde' },
-  { usuario: 'rdiaz',   clave: 'Sekunet2026', nombre: 'Roberto Diaz' },
-  { usuario: 'fperozo',   clave: 'Sekunet2026', nombre: 'Fabiana Perozo' },
-  { usuario: 'scastro',   clave: 'Sekunet2026', nombre: 'Sharon Castro' },
-  { usuario: 'nezpinoza',   clave: 'Sekunet2026', nombre: 'Nicole Espinoza' },
-  { usuario: 'ezambrano',   clave: 'Sekunet2026', nombre: 'Eliza Zambrano' },
-  { usuario: 'mcastro',   clave: 'Sekunet2026', nombre: 'Mariano Castro' },
+  { usuario: 'asesor1',   clave: 'Sekunet2025!', nombre: 'Asesor 1' },
+  { usuario: 'asesor2',   clave: 'Sekunet2025!', nombre: 'Asesor 2' },
+  { usuario: 'asesor3',   clave: 'Sekunet2025!', nombre: 'Asesor 3' },
   { usuario: 'admin',     clave: 'AdminSek2025!', nombre: 'Administrador' },
 ];
 
@@ -1429,7 +1429,7 @@ const USUARIOS = [
 // URL DEL FLOW DE POWER AUTOMATE
 // Reemplaza esta URL con la que genera tu Flow
 // ══════════════════════════════════════════════════════════
-const FLOW_URL = 'PEGAR_URL_DEL_FLOW_AQUI';
+const REGISTRO_URL = 'https://script.google.com/macros/s/AKfycbwpFwNE8H3P6cB3zqxzUcWCKEB_JQsPG75HBGUXN_I9Xnusc-lc5km0_zwZZFEabQKB5A/exec';
 
 // ── ESTADO DE SESIÓN ──────────────────────────────────────
 let usuarioActivo = null;
@@ -1484,25 +1484,67 @@ function hacerLogin() {
   });
 }
 
-async function registrarAcceso(nombre, fecha) {
-  if (!FLOW_URL || FLOW_URL === 'PEGAR_URL_DEL_FLOW_AQUI') {
-    console.log('Flow URL no configurada — registro omitido');
-    return;
-  }
+// ── FUNCIÓN CENTRAL DE REGISTRO ──────────────────────────
+async function enviarRegistro(datos) {
   try {
-    await fetch(FLOW_URL, {
+    await fetch(REGISTRO_URL, {
       method: 'POST',
+      mode: 'no-cors',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        asesor: nombre,
-        fecha: fecha.toLocaleDateString('es-CR', {day:'2-digit',month:'2-digit',year:'numeric'}),
-        hora: fecha.toLocaleTimeString('es-CR', {hour:'2-digit',minute:'2-digit',second:'2-digit'}),
-        fechaHora: fecha.toISOString()
-      })
+      body: JSON.stringify(datos)
     });
   } catch(e) {
-    console.warn('No se pudo registrar el acceso:', e.message);
+    console.warn('Registro omitido:', e.message);
   }
+}
+
+async function registrarAcceso(nombre, fecha) {
+  await enviarRegistro({
+    tipo: 'acceso',
+    asesor: nombre,
+    fecha: fecha.toLocaleDateString('es-CR', {day:'2-digit',month:'2-digit',year:'numeric'}),
+    hora: fecha.toLocaleTimeString('es-CR', {hour:'2-digit',minute:'2-digit',second:'2-digit'}),
+    fechaHora: fecha.toISOString()
+  });
+}
+
+function registrarCotizacion() {
+  if (!usuarioActivo) return;
+  const cliente  = document.getElementById('clientName')?.value  || '';
+  const proyecto = document.getElementById('clientRef')?.value   || '';
+  const asesor   = usuarioActivo.nombre;
+  const sub  = quoteItems.reduce((s,i) => s + getSalePrice(i)*i.qty, 0);
+  const iva  = sub * 0.13;
+  const tot  = sub + iva;
+  const ruta = route || 'aereo';
+  const lista = tipo || 'distribucion';
+  enviarRegistro({
+    tipo: 'cotizacion',
+    asesor,
+    cliente,
+    proyecto,
+    ruta: {'aereo':'Aéreo','maritimo':'Marítimo','terrestre':'Terrestre'}[ruta] || ruta,
+    lista: {'distribucion':'Distribución','proyecto':'Proyecto'}[lista] || lista,
+    subtotal: sub.toFixed(2),
+    iva: iva.toFixed(2),
+    total: tot.toFixed(2),
+    fecha: new Date().toLocaleDateString('es-CR', {day:'2-digit',month:'2-digit',year:'numeric'})
+  });
+}
+
+function registrarExportacion(tipoExport) {
+  if (!usuarioActivo) return;
+  const cliente = document.getElementById('clientName')?.value || '';
+  const sub = quoteItems.reduce((s,i) => s + getSalePrice(i)*i.qty, 0);
+  const tot = (sub * 1.13).toFixed(2);
+  enviarRegistro({
+    tipo: 'exportacion',
+    asesor: usuarioActivo.nombre,
+    tipoExport,
+    cliente,
+    total: tot,
+    fecha: new Date().toLocaleDateString('es-CR', {day:'2-digit',month:'2-digit',year:'numeric'})
+  });
 }
 
 function cerrarSesion() {
@@ -1523,6 +1565,67 @@ function cerrarSesion() {
 window.addEventListener('load', function() {
   document.getElementById('loginUser').focus();
 });
+</script>
+
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<script>
+function generarPDF(){
+  if(!usuarioActivo){ alert('Debes iniciar sesión'); return; }
+  const nombre   = document.getElementById('clientName')?.value  || 'Cliente';
+  const proyecto = document.getElementById('clientRef')?.value   || '';
+  const qidEl    = document.getElementById('qId');
+  const qid      = qidEl ? qidEl.textContent.split(' · ')[0] : 'COT';
+  const fn       = qid + '_' + nombre.replace(/\s+/g,'_') + (proyecto?'_'+proyecto.replace(/\s+/g,'_'):'') + '.pdf';
+
+  // Mostrar header de impresión
+  updatePrintHeader();
+  const phdr = document.getElementById('printHeader');
+  if(phdr) phdr.style.display='flex';
+
+  // Expandir panel
+  const right = document.querySelector('.right');
+  const origRight = right ? right.style.cssText : '';
+  if(right){ right.style.maxHeight='none'; right.style.overflow='visible'; }
+
+  // Ocultar nav
+  const hide = document.querySelectorAll('.left,.header,.hdr-right,.btn-del,.theme-toggle');
+  const origD = [];
+  hide.forEach(function(el){ origD.push(el.style.display); el.style.display='none'; });
+
+  const contenido = document.querySelector('.right');
+  html2pdf().set({
+    margin:[10,10,10,10],
+    filename: fn,
+    image:{type:'jpeg',quality:.98},
+    html2canvas:{scale:2,useCORS:true,backgroundColor:'#ffffff'},
+    jsPDF:{unit:'mm',format:'a4',orientation:'portrait'}
+  }).from(contenido).save().then(function(){
+    if(phdr) phdr.style.display='none';
+    if(right) right.style.cssText = origRight;
+    hide.forEach(function(el,i){ el.style.display=origD[i]; });
+    registrarExportacion('PDF');
+    registrarCotizacion();
+  });
+}
+
+function printQuote(){
+  updatePrintHeader();
+  const phdr = document.getElementById('printHeader');
+  if(phdr) phdr.style.display='flex';
+  const right = document.querySelector('.right');
+  const origStyle = right ? right.style.cssText : '';
+  if(right){ right.style.maxHeight='none'; right.style.overflow='visible'; }
+  setTimeout(function(){
+    window.print();
+    setTimeout(function(){
+      if(phdr) phdr.style.display='none';
+      if(right) right.style.cssText = origStyle;
+      registrarExportacion('Impresión');
+      registrarCotizacion();
+    }, 800);
+  }, 150);
+}
 </script>
 
 </body></html>
