@@ -754,8 +754,9 @@ let F = {
 };
 
 const CATEGORIES = ["Access Control Products", "Accessories", "Alarm Cable", "Alarm Products", "Audio Products", "Backend Products", "Backup UPS", "Cabinet", "Cameras Products", "Coaxial Cable", "Display and Control", "Fiber Optics", "Fire Products", "ITS Products", "Interactive Flat Panel Display", "LED Display", "Monitor", "Network cable", "Networking", "Onboard Security", "Online UPS", "PDA Terminal", "PDS Accessories", "Parking Management", "Patchcord,Balun,Plug", "Portable Products", "Radar Products", "Security Inspection Products", "Sensing Products", "Server Products", "Software", "Speed Gates and Turnstiles", "Thermal Products", "Video Intercom Products"];
-let MARGINS = { global:25, byList:{distribucion:22,proyecto:20}, byCat:{} };
-CATEGORIES.forEach(c=>{ MARGINS.byCat[c]=30; });
+let MARGINS = { global:20, byList:{distribucion:22,proyecto:20}, byCat:{} };
+const _CAT_DEF={'Backup UPS':18,'Coaxial Cable':18,'Interactive Flat Panel Display':22,'LED Display':22,'Monitor':22};
+CATEGORIES.forEach(c=>{ MARGINS.byCat[c]=_CAT_DEF[c]??null; });
 
 function getMargin(item){
   const bc=MARGINS.byCat[item.cat];
@@ -1446,6 +1447,7 @@ let USUARIOS = [
   { usuario: 'nezpinoza',   clave: 'Sekunet2026', nombre: 'Nicole Espinoza' },
   { usuario: 'ezambrano',   clave: 'Sekunet2026', nombre: 'Eliza Zambrano' },
   { usuario: 'mcastro',   clave: 'Sekunet2026', nombre: 'Mariano Castro' },
+  { usuario: 'calvarado', clave: 'Sekunet2026',   nombre: 'Christopher Alvarado' },
   { usuario: 'admin',     clave: 'AdminSek2025!', nombre: 'Administrador' },
 ];
 
