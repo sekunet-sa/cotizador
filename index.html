@@ -119,7 +119,7 @@ tbody tr:hover{background:var(--surface2);}
 tbody td{padding:.6rem .9rem;vertical-align:middle;}
 .td-model{font-weight:500;max-width:220px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .td-model small{display:block;font-size:.66rem;color:var(--muted);margin-top:1px;font-weight:400;}
-.qty-inp{min-width:32px;max-width:80px;text-align:center;padding:.18rem .28rem;font-size:.75rem;font-family:'DM Mono',monospace;}
+.qty-inp{min-width:58px;max-width:90px;text-align:center;padding:.22rem .4rem;font-size:.82rem;font-family:'DM Mono',monospace;color:var(--txt,#111);background:var(--surface,#fff);border:1px solid var(--border,#ddd);border-radius:4px;}
 .inp-err{border-color:#e05c0a!important;box-shadow:0 0 0 2px rgba(224,92,10,.2)!important;}
 .tv{color:var(--success);font-weight:700;font-family:'DM Mono',monospace;}
 .tt{color:var(--accent2);font-weight:700;font-family:'DM Mono',monospace;}
@@ -410,7 +410,7 @@ textarea{resize:vertical;min-height:56px;font-size:.82rem;}
         <div class="tab-name">Distribución</div>
         <div class="tab-desc">Distribuidores y revendedores</div>
       </button>
-      <button class="tab-btn active" onclick="setTipo(&#39;proyecto&#39;)" id="tb-proy">
+      <button class="tab-btn" onclick="setTipo(&#39;proyecto&#39;)" id="tb-proy">
         <span class="tab-icon">🏗️</span>
         <div class="tab-name">Proyecto</div>
         <div class="tab-desc">Instalaciones y licitaciones</div>
@@ -426,7 +426,7 @@ textarea{resize:vertical;min-height:56px;font-size:.82rem;}
         <div class="route-name">Aéreo</div>
         <div class="route-time">8-10 semanas</div>
       </button>
-      <button class="route-card active" onclick="setRoute(&#39;maritimo&#39;)" id="rc-maritimo">
+      <button class="route-card" onclick="setRoute(&#39;maritimo&#39;)" id="rc-maritimo">
         <span class="route-icon">🚢</span>
         <div class="route-name">Marítimo</div>
         <div class="route-time">12-15 semanas</div>
@@ -440,14 +440,14 @@ textarea{resize:vertical;min-height:56px;font-size:.82rem;}
     <div class="chip chip-blue" id="routeChip">✈️ Aéreo · Base: FOB China</div>
   </div>
 
-  <div id="regSection" style="">
+  <div id="regSection" style="display:none">
     <div class="sec-label">📜 Registro aduanal</div>
     <div class="reg-row">
       <button class="reg-btn" onclick="setRegistro(&#39;con&#39;)" id="rb-con">
         <div class="reg-label">✅ Con Registro</div>
         <div style="font-size:.63rem;color:var(--muted);margin-top:2px;">Precio oficial</div>
       </button>
-      <button class="reg-btn active" onclick="setRegistro(&#39;sin&#39;)" id="rb-sin">
+      <button class="reg-btn" onclick="setRegistro(&#39;sin&#39;)" id="rb-sin">
         <div class="reg-label">⚪ Sin Registro</div>
         <div style="font-size:.63rem;color:var(--muted);margin-top:2px;">Sin trámite</div>
       </button>
@@ -572,7 +572,7 @@ textarea{resize:vertical;min-height:56px;font-size:.82rem;}
       <div style="font-size:1rem;font-weight:700;">Sekunet S.A.</div>
       <div style="font-size:.72rem;color:#666;">Distribuidor Mayorista · HIKVISION / PDS · www.sekunet.com</div>
     </div>
-    <div style="text-align:right;font-size:.78rem;color:#444;line-height:1.6;">
+    <div style="flex:1;text-align:right;font-size:.78rem;color:#444;line-height:1.6;margin-left:1rem;">
       <div style="font-size:.95rem;font-weight:700;color:#111;" id="ph-cliente"></div>
       <div id="ph-proyecto"></div>
       <div id="ph-asesor"></div>
@@ -775,7 +775,7 @@ const DELIVERY = {
 };
 const LICENSE_TIME = '8-10 días hábiles';
 
-let tipo='distribucion', route='aereo', registro='con';
+let tipo=null, route=null, registro=null;
 let quoteItems=[];
 const ADMIN_PWD='admin1234';
 let adminUnlocked=false, adminTab='users';
@@ -888,6 +888,12 @@ function setRegistro(r){
   updateChips(); renderTable();
 }
 function updateChips(){
+  if(!tipo||!route){
+    document.getElementById('routeChip').textContent='';
+    document.getElementById('qTags').innerHTML='';
+    document.getElementById('routeSummary').textContent='';
+    return;
+  }
   const base=route==='terrestre'?'EXW Panamá':'FOB China';
   document.getElementById('routeChip').textContent=RL[route]+' · Base: '+base;
   if(tipo==='proyecto')
@@ -940,16 +946,26 @@ function renderResults(){
   box.style.display='block';
   if(!res.length){box.innerHTML='<div class="no-res">Sin resultados</div>';return;}
   box.innerHTML=res.map(({p,i})=>{
+    const badge=p.tipo==='proyecto'
+      ?'<span class="badge b-proy">Proy.</span>'
+      :(p.marca==='Hilook'?'<span class="badge b-pds">HiLook</span>':'<span class="badge b-hik">HIK</span>');
+    const sp=p.sp?'<span class="badge b-sp">⚠️</span>':'';
+    const faltaRuta = !route;
+    const faltaReg  = p.tipo==='proyecto' && !registro;
+    if (faltaRuta || faltaReg) {
+      const hint = faltaRuta ? 'Seleccioná la ruta' : 'Seleccioná el registro aduanal';
+      return `<div class="prod-item" onclick="addProduct(${i})">
+        <div class="prod-name">${p.n} ${badge}${sp}</div>
+        <div class="prod-meta">${p.cat}${p.sub?' · '+p.sub:''}</div>
+        <div class="prod-price" style="color:var(--muted);font-style:italic;font-size:.72rem">⚠️ ${hint}</div>
+      </div>`;
+    }
     const cost=getBaseCost(i);
     if(!cost)return '';
     const fc=F[p.tipo]?.[route];
     const factor=p.sp?fc.special:fc.normal;
     const margin=MARGINS.byCat[p.cat]??MARGINS.byList[p.tipo]??MARGINS.global;
     const pv=(cost*factor)/(1-margin/100);
-    const badge=p.tipo==='proyecto'
-      ?'<span class="badge b-proy">Proy.</span>'
-      :(p.marca==='Hilook'?'<span class="badge b-pds">HiLook</span>':'<span class="badge b-hik">HIK</span>');
-    const sp=p.sp?'<span class="badge b-sp">⚠️</span>':'';
     return `<div class="prod-item" onclick="addProduct(${i})">
       <div class="prod-name">${p.n} ${badge}${sp}</div>
       <div class="prod-meta">${p.cat}${p.sub?' · '+p.sub:''}</div>
@@ -959,6 +975,9 @@ function renderResults(){
 }
 
 function addProduct(idx){
+  if(!tipo){mostrarToast('⚠️ Seleccioná el tipo de lista','#e05c0a');return;}
+  if(!route){mostrarToast('⚠️ Seleccioná la ruta de importación','#e05c0a');return;}
+  if(tipo==='proyecto'&&!registro){mostrarToast('⚠️ Seleccioná el registro aduanal','#e05c0a');return;}
   const p=PRODUCTS_BASE[idx];
   const cost=getBaseCost(idx);
   if(!cost)return;
@@ -1007,7 +1026,7 @@ function renderTable(){
       <td style="white-space:nowrap;">${lb}${sp}${rg}</td>
       <td style="font-size:.7rem;color:var(--muted);white-space:nowrap;">${rutaLabel[itemRuta]||itemRuta}</td>
       <td style="font-size:.7rem;color:var(--muted);white-space:nowrap;">${entregaLabel[itemRuta]||''}</td>
-      <td><input class="qty-inp" type="number" min="1" value="${item.qty}" style="width:${Math.max(2,(item.qty+'').length)+1.6}ch" oninput="updQty(${i},this.value);this.style.width=Math.max(2,this.value.length||1)+1.6+'ch'" /></td>
+      <td><input class="qty-inp" type="number" min="1" value="${item.qty}" oninput="updQty(${i},this.value)" /></td>
       <td class="tv">${fmt(pv)}</td>
       <td class="tt">${fmt(total)}</td>
       <td><button class="btn-del" onclick="removeItem(${i})">✕</button></td>
