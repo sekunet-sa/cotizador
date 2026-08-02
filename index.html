@@ -1797,66 +1797,382 @@ function generarPDF() {
 
 <script>
 /* ══════════════════════════════════════════════════════════════════
-   SUPABASE INTEGRATION — Auth + Guardar Cotizaciones
-   Versión: 1.0 · Sekunet S.A.
-   IMPORTANTE: Este bloque va al final del archivo, antes de </body>
-   y REEMPLAZA el login con autenticación via Supabase.
-   Los usuarios se gestionan desde el Cotizador PM.
+   SUPABASE AUTH — Registro + Verificación por código de email
+   Sekunet S.A. · Cotizador Pro · v2.0
+   Acceso exclusivo: @sekunet.com
 ══════════════════════════════════════════════════════════════════ */
-(function() {
+(function () {
   'use strict';
 
-  /* ── Config Supabase ─────────────────────────────────────────── */
-  const SB_URL  = 'https://loldcmqaklfpmvnxkxbu.supabase.co';
-  const SB_KEY  = 'sb_publishable_8bgwyL4KMc2wNwLqnVaV4A_9RbdgW_K';
-  const SALT    = 'sekunet_qp_2026';
-  const SESSION = 'sek_vendedor_v1';
+  /* ── Config ──────────────────────────────────────────────────── */
+  const SB_URL    = 'https://loldcmqaklfpmvnxkxbu.supabase.co';
+  const SB_KEY    = 'sb_publishable_8bgwyL4KMc2wNwLqnVaV4A_9RbdgW_K';
+  const DOMAIN    = '@sekunet.com';
+  const SESS_KEY  = 'sek_auth_v2';
 
-  const _hdrs = {
-    'apikey':        SB_KEY,
-    'Authorization': `Bearer ${SB_KEY}`,
-    'Content-Type':  'application/json',
-  };
+  const _baseHdrs = { 'apikey': SB_KEY, 'Content-Type': 'application/json' };
 
-  /* ── Helpers ─────────────────────────────────────────────────── */
-  async function _hash(pass) {
-    const enc = new TextEncoder();
-    const buf = await crypto.subtle.digest('SHA-256', enc.encode(pass + SALT));
-    return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
+  /* ── Estado ──────────────────────────────────────────────────── */
+  let _sess        = null;   // { access_token, user: { id, email, nombre } }
+  let _pendEmail   = '';     // email en espera de verificación
+  let _pendNombre  = '';
+  let _verifyType  = 'signup'; // 'signup' = registro, 'email' = login 2FA
+
+  /* ── Supabase Auth REST ──────────────────────────────────────── */
+  async function _auth(path, body, token) {
+    const h = { ..._baseHdrs };
+    if (token) h['Authorization'] = 'Bearer ' + token;
+    const r = await fetch(SB_URL + '/auth/v1' + path, {
+      method: 'POST', headers: h, body: JSON.stringify(body),
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.msg || d.error_description || d.message || 'Error ' + r.status);
+    return d;
   }
 
+  /* ── Supabase DB REST ────────────────────────────────────────── */
   async function _sb(path, opts = {}) {
-    const r = await fetch(`${SB_URL}/rest/v1${path}`, {
-      ...opts,
-      headers: { ..._hdrs, ...(opts.headers || {}) },
+    const h = { ..._baseHdrs };
+    if (_sess?.access_token) h['Authorization'] = 'Bearer ' + _sess.access_token;
+    const r = await fetch(SB_URL + '/rest/v1' + path, {
+      ...opts, headers: { ...h, ...(opts.headers || {}) },
     });
-    if (!r.ok) {
-      const e = await r.json().catch(() => ({}));
-      throw new Error(e.message || `HTTP ${r.status}`);
-    }
+    if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.message || 'HTTP ' + r.status); }
     return r.status === 204 ? null : r.json();
   }
 
-  function _genId() {
-    return 'COT-' + Date.now().toString(36).toUpperCase() + Math.random().toString(36).slice(2,5).toUpperCase();
+  /* ── Sesión ──────────────────────────────────────────────────── */
+  function _saveSession(data) {
+    _sess = {
+      access_token: data.access_token,
+      user: {
+        id:     data.user.id,
+        email:  data.user.email,
+        nombre: (data.user.user_metadata && data.user.user_metadata.nombre)
+                  ? data.user.user_metadata.nombre
+                  : data.user.email.split('@')[0],
+      },
+    };
+    sessionStorage.setItem(SESS_KEY, JSON.stringify(_sess));
   }
 
-  /* ── Estado de sesión ────────────────────────────────────────── */
-  let _session = null;
-
-  function _setSession(u) {
-    _session = u;
-    sessionStorage.setItem(SESSION, JSON.stringify(u));
+  function _loadSession() {
+    try { const s = sessionStorage.getItem(SESS_KEY); if (s) _sess = JSON.parse(s); } catch (e) {}
+    return _sess;
   }
 
-  function _getSession() {
-    if (_session) return _session;
-    try { _session = JSON.parse(sessionStorage.getItem(SESSION)); } catch(e) {}
-    return _session;
+  /* ══════════════════════════════════════════════════════════════
+     CONSTRUIR LOGIN OVERLAY (reemplaza el original)
+  ══════════════════════════════════════════════════════════════ */
+  function _buildOverlay() {
+    const ov = document.getElementById('loginOverlay');
+    if (!ov) return;
+    ov.innerHTML = `
+<div class="login-box" style="width:400px;max-width:95vw;">
+  <div class="login-logo">
+    <div class="login-logo-ico">📡</div>
+    <div class="login-logo-txt">
+      <span>Sekunet S.A.</span>
+      <span>Cotizador Pro · Distribución HIKVISION</span>
+    </div>
+  </div>
+
+  <!-- ── PANEL: INICIAR SESIÓN ── -->
+  <div id="pnl-login">
+    <div class="login-title" style="margin-bottom:.9rem">Iniciar Sesión</div>
+    <div class="login-field">
+      <label>Correo @sekunet.com</label>
+      <input type="email" id="lf-email" placeholder="usuario@sekunet.com" autocomplete="email"
+        onkeydown="if(event.key==='Enter')document.getElementById('lf-pass').focus()">
+    </div>
+    <div class="login-field">
+      <label>Contraseña</label>
+      <input type="password" id="lf-pass" placeholder="Tu contraseña"
+        onkeydown="if(event.key==='Enter')_sekLogin()">
+    </div>
+    <div class="login-err" id="lf-err"></div>
+    <div class="login-spinner" id="lf-spin"></div>
+    <button class="login-btn" id="lf-btn" onclick="_sekLogin()">Ingresar</button>
+    <div style="text-align:center;margin-top:.9rem;display:flex;flex-direction:column;gap:.45rem">
+      <button onclick="_sekShowPanel('pnl-register')"
+        style="background:none;border:none;color:#e05c0a;font-size:.82rem;cursor:pointer">
+        ✨ Crear mi cuenta
+      </button>
+      <button onclick="_sekShowPanel('pnl-forgot')"
+        style="background:none;border:none;color:#5a6480;font-size:.76rem;cursor:pointer">
+        Olvidé mi contraseña
+      </button>
+    </div>
+  </div>
+
+  <!-- ── PANEL: REGISTRO ── -->
+  <div id="pnl-register" style="display:none">
+    <div class="login-title" style="margin-bottom:.9rem">Crear Cuenta</div>
+    <div style="font-size:.76rem;color:#5a6480;margin-bottom:.9rem;line-height:1.5;background:rgba(224,92,10,.08);border:1px solid rgba(224,92,10,.2);padding:.55rem .75rem;border-radius:8px;">
+      🔒 Solo cuentas <strong style="color:#e05c0a">@sekunet.com</strong> pueden registrarse.<br>
+      Recibirás un código de 6 dígitos en tu correo para confirmar tu identidad.
+    </div>
+    <div class="login-field">
+      <label>Nombre completo</label>
+      <input type="text" id="rf-nombre" placeholder="Ej: Carolina Chavarria" autocomplete="name">
+    </div>
+    <div class="login-field">
+      <label>Correo corporativo</label>
+      <input type="email" id="rf-email" placeholder="cchavarria@sekunet.com" autocomplete="email">
+    </div>
+    <div class="login-field">
+      <label>Contraseña</label>
+      <input type="password" id="rf-pass" placeholder="Mínimo 6 caracteres">
+    </div>
+    <div class="login-field">
+      <label>Confirmar contraseña</label>
+      <input type="password" id="rf-pass2" placeholder="Repetí la contraseña"
+        onkeydown="if(event.key==='Enter')_sekRegistrar()">
+    </div>
+    <div class="login-err" id="rf-err"></div>
+    <div class="login-spinner" id="rf-spin"></div>
+    <button class="login-btn" id="rf-btn" onclick="_sekRegistrar()">Crear Cuenta y Enviar Código</button>
+    <div style="text-align:center;margin-top:.75rem">
+      <button onclick="_sekShowPanel('pnl-login')"
+        style="background:none;border:none;color:#5a6480;font-size:.78rem;cursor:pointer">
+        ← Ya tengo cuenta
+      </button>
+    </div>
+  </div>
+
+  <!-- ── PANEL: VERIFICAR CÓDIGO ── -->
+  <div id="pnl-verify" style="display:none">
+    <div class="login-title" id="vf-title" style="margin-bottom:.9rem">Verificá tu Correo</div>
+    <div style="font-size:.84rem;color:#8090b0;margin-bottom:1.4rem;line-height:1.6;text-align:center">
+      <span id="vf-msg">Te enviamos un código de 6 dígitos a</span><br>
+      <strong id="vf-email-show" style="color:#e4e8f0;font-family:monospace"></strong>
+    </div>
+    <div class="login-field">
+      <label style="text-align:center;display:block">Código de verificación</label>
+      <input type="text" id="vf-code" placeholder="000000" maxlength="6" inputmode="numeric"
+        style="font-size:1.8rem;letter-spacing:.5em;text-align:center;font-family:monospace;padding:.6rem"
+        onkeydown="if(event.key==='Enter')_sekVerificar()">
+    </div>
+    <div class="login-err" id="vf-err"></div>
+    <div class="login-spinner" id="vf-spin"></div>
+    <button class="login-btn" id="vf-btn" onclick="_sekVerificar()">✓ Verificar y Entrar</button>
+    <div style="text-align:center;margin-top:.75rem;display:flex;flex-direction:column;gap:.35rem">
+      <button id="vf-resend" onclick="_sekReenviar()"
+        style="background:none;border:none;color:#5a6480;font-size:.76rem;cursor:pointer">
+        📧 Reenviar código
+      </button>
+      <button onclick="_sekShowPanel('pnl-register')"
+        style="background:none;border:none;color:#5a6480;font-size:.74rem;cursor:pointer">
+        ← Volver al registro
+      </button>
+    </div>
+  </div>
+
+  <!-- ── PANEL: OLVIDÉ CONTRASEÑA ── -->
+  <div id="pnl-forgot" style="display:none">
+    <div class="login-title" style="margin-bottom:.9rem">Recuperar Contraseña</div>
+    <div style="font-size:.8rem;color:#8090b0;margin-bottom:1rem;line-height:1.5">
+      Ingresá tu correo @sekunet.com y te enviaremos un enlace para restablecer tu contraseña.
+    </div>
+    <div class="login-field">
+      <label>Correo @sekunet.com</label>
+      <input type="email" id="fg-email" placeholder="cchavarria@sekunet.com"
+        onkeydown="if(event.key==='Enter')_sekRecuperar()">
+    </div>
+    <div class="login-err" id="fg-err"></div>
+    <div class="login-spinner" id="fg-spin"></div>
+    <button class="login-btn" id="fg-btn" onclick="_sekRecuperar()">Enviar Enlace</button>
+    <div style="text-align:center;margin-top:.75rem">
+      <button onclick="_sekShowPanel('pnl-login')"
+        style="background:none;border:none;color:#5a6480;font-size:.78rem;cursor:pointer">
+        ← Volver
+      </button>
+    </div>
+  </div>
+
+  <div class="login-footer" style="margin-top:1rem">
+    Sekunet S.A. · Acceso exclusivo @sekunet.com
+  </div>
+</div>`;
+    setTimeout(() => document.getElementById('lf-email')?.focus(), 100);
   }
 
-  /* ── Mostrar app tras login ──────────────────────────────────── */
-  function _enterApp(u) {
+  /* ── Cambiar panel ───────────────────────────────────────────── */
+  window._sekShowPanel = function (id) {
+    ['pnl-login', 'pnl-register', 'pnl-verify', 'pnl-forgot'].forEach(p => {
+      const el = document.getElementById(p);
+      if (el) el.style.display = (p === id) ? '' : 'none';
+    });
+    const panel = document.getElementById(id);
+    if (panel) { const inp = panel.querySelector('input'); if (inp) setTimeout(() => inp.focus(), 80); }
+  };
+
+  /* ══════════════════════════════════════════════════════════════
+     INICIAR SESIÓN
+  ══════════════════════════════════════════════════════════════ */
+  window._sekLogin = async function () {
+    const email = (document.getElementById('lf-email')?.value || '').trim().toLowerCase();
+    const pass  = document.getElementById('lf-pass')?.value || '';
+    const errEl = document.getElementById('lf-err');
+    const btn   = document.getElementById('lf-btn');
+    const spin  = document.getElementById('lf-spin');
+
+    errEl.textContent = '';
+    if (!email || !pass) { errEl.textContent = 'Ingresá correo y contraseña.'; return; }
+    if (!email.endsWith(DOMAIN)) { errEl.textContent = 'Solo cuentas ' + DOMAIN + ' permitidas.'; return; }
+
+    btn.disabled = true; spin.style.display = 'block';
+    try {
+      /* Paso 1: verificar contraseña */
+      await _auth('/token?grant_type=password', { email, password: pass });
+
+      /* Paso 2: enviar código OTP al correo (2FA) */
+      await _auth('/otp', { email, options: { shouldCreateUser: false } });
+
+      /* Mostrar panel de verificación con mensaje de 2FA */
+      _pendEmail   = email;
+      _verifyType  = 'email';
+      document.getElementById('vf-email-show').textContent = email;
+      document.getElementById('vf-title').textContent = '🔐 Verificación de Acceso';
+      document.getElementById('vf-msg').textContent   = 'Por seguridad, enviamos un código de 6 dígitos a';
+      const codeInp = document.getElementById('vf-code');
+      if (codeInp) codeInp.value = '';
+      _sekShowPanel('pnl-verify');
+
+    } catch (e) {
+      const msg = e.message.toLowerCase();
+      if (msg.includes('confirm') || msg.includes('verif') || msg.includes('not confirmed')) {
+        errEl.textContent = '⚠ Tu cuenta no está verificada. Revisá tu correo para el código inicial.';
+        _pendEmail  = email;
+        _verifyType = 'signup';
+        document.getElementById('vf-email-show').textContent = email;
+        document.getElementById('vf-title').textContent = 'Verificá tu Correo';
+        document.getElementById('vf-msg').textContent   = 'Te enviamos un código de 6 dígitos a';
+        setTimeout(() => _sekShowPanel('pnl-verify'), 1800);
+      } else if (msg.includes('invalid') || msg.includes('credentials') || msg.includes('password')) {
+        errEl.textContent = 'Correo o contraseña incorrectos.';
+      } else {
+        errEl.textContent = e.message;
+      }
+    }
+    btn.disabled = false; spin.style.display = 'none';
+  };
+
+  /* ══════════════════════════════════════════════════════════════
+     REGISTRO
+  ══════════════════════════════════════════════════════════════ */
+  window._sekRegistrar = async function () {
+    const nombre = (document.getElementById('rf-nombre')?.value || '').trim();
+    const email  = (document.getElementById('rf-email')?.value  || '').trim().toLowerCase();
+    const pass   = document.getElementById('rf-pass')?.value  || '';
+    const pass2  = document.getElementById('rf-pass2')?.value || '';
+    const errEl  = document.getElementById('rf-err');
+    const btn    = document.getElementById('rf-btn');
+    const spin   = document.getElementById('rf-spin');
+
+    errEl.textContent = '';
+    if (!nombre)  { errEl.textContent = 'Ingresá tu nombre completo.'; return; }
+    if (!email)   { errEl.textContent = 'Ingresá tu correo.'; return; }
+    if (!email.endsWith(DOMAIN)) { errEl.textContent = 'Solo se permite correo' + DOMAIN + '.'; return; }
+    if (pass.length < 6) { errEl.textContent = 'La contraseña debe tener al menos 6 caracteres.'; return; }
+    if (pass !== pass2)  { errEl.textContent = 'Las contraseñas no coinciden.'; return; }
+
+    btn.disabled = true; spin.style.display = 'block';
+    try {
+      await _auth('/signup', { email, password: pass, data: { nombre } });
+      _pendEmail  = email;
+      _pendNombre = nombre;
+      _verifyType = 'signup';
+      document.getElementById('vf-email-show').textContent = email;
+      document.getElementById('vf-title').textContent = 'Verificá tu Correo';
+      document.getElementById('vf-msg').textContent   = 'Te enviamos un código de 6 dígitos a';
+      const codeInp = document.getElementById('vf-code');
+      if (codeInp) codeInp.value = '';
+      _sekShowPanel('pnl-verify');
+    } catch (e) {
+      const msg = e.message.toLowerCase();
+      if (msg.includes('already') || msg.includes('exists') || msg.includes('registered')) {
+        errEl.textContent = 'Este correo ya tiene una cuenta. Iniciá sesión.';
+      } else {
+        errEl.textContent = e.message;
+      }
+    }
+    btn.disabled = false; spin.style.display = 'none';
+  };
+
+  /* ══════════════════════════════════════════════════════════════
+     VERIFICAR CÓDIGO
+  ══════════════════════════════════════════════════════════════ */
+  window._sekVerificar = async function () {
+    const code  = (document.getElementById('vf-code')?.value || '').trim().replace(/\s/g, '');
+    const errEl = document.getElementById('vf-err');
+    const btn   = document.getElementById('vf-btn');
+    const spin  = document.getElementById('vf-spin');
+
+    errEl.textContent = '';
+    if (!code || code.length !== 6 || !/^\d+$/.test(code)) {
+      errEl.textContent = 'Ingresá los 6 dígitos del código.';
+      return;
+    }
+
+    btn.disabled = true; spin.style.display = 'block';
+    try {
+      const data = await _auth('/verify', { email: _pendEmail, token: code, type: _verifyType });
+      _saveSession(data);
+      _enterApp();
+    } catch (e) {
+      const msg = e.message.toLowerCase();
+      if (msg.includes('expired') || msg.includes('invalid') || msg.includes('otp')) {
+        errEl.textContent = 'Código incorrecto o expirado. Solicitá uno nuevo.';
+      } else {
+        errEl.textContent = e.message;
+      }
+    }
+    btn.disabled = false; spin.style.display = 'none';
+  };
+
+  /* ── Reenviar código ─────────────────────────────────────────── */
+  window._sekReenviar = async function () {
+    if (!_pendEmail) return;
+    const btn = document.getElementById('vf-resend');
+    if (btn) { btn.disabled = true; btn.textContent = 'Enviando...'; }
+    try {
+      await _auth('/resend', { email: _pendEmail, type: _verifyType });
+      _toast('📧 Código reenviado a ' + _pendEmail);
+    } catch (e) {
+      _toast('No se pudo reenviar: ' + e.message, '#e05c0a');
+    }
+    /* Esperar 30s antes de poder reenviar de nuevo */
+    setTimeout(() => { if (btn) { btn.disabled = false; btn.textContent = '📧 Reenviar código'; } }, 30000);
+  };
+
+  /* ── Recuperar contraseña ────────────────────────────────────── */
+  window._sekRecuperar = async function () {
+    const email = (document.getElementById('fg-email')?.value || '').trim().toLowerCase();
+    const errEl = document.getElementById('fg-err');
+    const btn   = document.getElementById('fg-btn');
+    const spin  = document.getElementById('fg-spin');
+
+    errEl.textContent = '';
+    if (!email)                    { errEl.textContent = 'Ingresá tu correo.'; return; }
+    if (!email.endsWith(DOMAIN))   { errEl.textContent = 'Solo correos' + DOMAIN + '.'; return; }
+
+    btn.disabled = true; spin.style.display = 'block';
+    try {
+      await _auth('/recover', { email });
+      errEl.style.color = '#22c55e';
+      errEl.textContent = '✅ Enlace enviado. Revisá tu correo.';
+    } catch (e) {
+      errEl.textContent = e.message;
+    }
+    btn.disabled = false; spin.style.display = 'none';
+  };
+
+  /* ══════════════════════════════════════════════════════════════
+     ENTRAR A LA APP
+  ══════════════════════════════════════════════════════════════ */
+  function _enterApp() {
+    const u = _sess.user;
     document.getElementById('loginOverlay').classList.add('oculto');
     const bar = document.getElementById('sessionBar');
     if (bar) {
@@ -1864,80 +2180,88 @@ function generarPDF() {
       const el = document.getElementById('sessionUser');
       if (el) el.textContent = u.nombre;
       const te = document.getElementById('sessionTime');
-      if (te) te.textContent = 'Ingreso: ' + new Date().toLocaleString('es-CR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
+      if (te) te.textContent = 'Ingreso: ' + new Date().toLocaleString('es-CR', {
+        day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
+      });
     }
-    const asesorEl = document.getElementById('clientContact');
-    if (asesorEl && !asesorEl.value) asesorEl.value = u.nombre;
-    _addHeaderButtons();
+    const asesor = document.getElementById('clientContact');
+    if (asesor && !asesor.value) asesor.value = u.nombre;
+    window.usuarioActivo = { usuario: u.email, nombre: u.nombre, clave: '' };
+    _addHeaderBtns();
   }
 
-  /* ── Botones en header ───────────────────────────────────────── */
-  function _addHeaderButtons() {
-    if (document.getElementById('btn-sek-historial')) return;
+  function _addHeaderBtns() {
+    if (document.getElementById('btn-sek-save')) return;
     const hdr = document.querySelector('.hdr-right');
     if (!hdr) return;
 
-    const btnHist = document.createElement('button');
-    btnHist.id = 'btn-sek-historial';
-    btnHist.className = 'btn btn-ghost btn-sm';
-    btnHist.innerHTML = '📂 Mis Cots.';
-    btnHist.addEventListener('click', _verHistorial);
-    hdr.insertBefore(btnHist, hdr.firstChild);
+    const bHist = document.createElement('button');
+    bHist.id = 'btn-sek-historial'; bHist.className = 'btn btn-ghost btn-sm';
+    bHist.innerHTML = '📂 Mis Cots.';
+    bHist.addEventListener('click', _verHistorial);
+    hdr.insertBefore(bHist, hdr.firstChild);
 
-    const btnSave = document.createElement('button');
-    btnSave.id = 'btn-sek-save';
-    btnSave.className = 'btn btn-green btn-sm';
-    btnSave.innerHTML = '💾 Guardar';
-    btnSave.style.marginLeft = '4px';
-    btnSave.addEventListener('click', _guardarCotizacion);
-    hdr.insertBefore(btnSave, btnHist.nextSibling);
+    const bSave = document.createElement('button');
+    bSave.id = 'btn-sek-save'; bSave.className = 'btn btn-green btn-sm';
+    bSave.innerHTML = '💾 Guardar';
+    bSave.addEventListener('click', _guardar);
+    hdr.insertBefore(bSave, bHist.nextSibling);
   }
+
+  /* ══════════════════════════════════════════════════════════════
+     CERRAR SESIÓN (override del original)
+  ══════════════════════════════════════════════════════════════ */
+  window.cerrarSesion = function () {
+    if (!confirm('¿Cerrar sesión?')) return;
+    if (_sess?.access_token) {
+      fetch(SB_URL + '/auth/v1/logout', {
+        method: 'POST',
+        headers: { ..._baseHdrs, 'Authorization': 'Bearer ' + _sess.access_token },
+      }).catch(() => {});
+    }
+    sessionStorage.removeItem(SESS_KEY);
+    _sess = null;
+    window.usuarioActivo = null;
+    document.getElementById('btn-sek-save')?.remove();
+    document.getElementById('btn-sek-historial')?.remove();
+    document.getElementById('sessionBar').style.display = 'none';
+    _buildOverlay();
+    document.getElementById('loginOverlay').classList.remove('oculto');
+  };
 
   /* ══════════════════════════════════════════════════════════════
      GUARDAR COTIZACIÓN
   ══════════════════════════════════════════════════════════════ */
-  async function _guardarCotizacion() {
-    const u = _getSession();
-    if (!u) { alert('No hay sesión activa.'); return; }
-
-    /* Recopilar items desde el estado global de la app */
+  async function _guardar() {
+    if (!_sess) { alert('No hay sesión activa.'); return; }
+    const u = _sess.user;
     const items = (typeof quoteItems !== 'undefined' ? quoteItems : []).map(item => {
       const pv = typeof getSalePrice === 'function' ? getSalePrice(item) : 0;
-      return {
-        modelo:  item.modelo,
-        marca:   item.marca,
-        cat:     item.cat,
-        qty:     item.qty,
-        precio:  +pv.toFixed(4),
-        total:   +(pv * item.qty).toFixed(4),
-      };
+      return { modelo: item.modelo, marca: item.marca, cat: item.cat, qty: item.qty,
+               precio: +pv.toFixed(4), total: +(pv * item.qty).toFixed(4) };
     });
-
-    const sub = items.reduce((s, i) => s + i.total, 0);
-    const total_usd = +(sub * 1.13).toFixed(2);
-
-    /* Tipo de lista y ruta activos */
+    const sub     = items.reduce((s, i) => s + i.total, 0);
     const tipoEl  = document.querySelector('.tab-btn.active .tab-name');
     const rutaEl  = document.querySelector('.route-card.active .route-name');
 
     const cot = {
-      id:              _genId(),
+      id:              'COT-' + Date.now().toString(36).toUpperCase(),
       vendedor_id:     u.id,
       vendedor_nombre: u.nombre,
-      cliente:     document.getElementById('clientName')?.value?.trim()    || '',
-      contacto:    document.getElementById('clientContact')?.value?.trim() || '',
-      referencia:  document.getElementById('clientRef')?.value?.trim()     || '',
-      notas:       document.getElementById('notes')?.value?.trim()         || '',
-      tipo:        tipoEl  ? tipoEl.textContent.trim()  : '',
-      ruta:        rutaEl  ? rutaEl.textContent.trim()  : '',
-      total_usd,
+      vendedor_email:  u.email,
+      cliente:    (document.getElementById('clientName')?.value    || '').trim(),
+      contacto:   (document.getElementById('clientContact')?.value || '').trim(),
+      referencia: (document.getElementById('clientRef')?.value     || '').trim(),
+      notas:      (document.getElementById('notes')?.value         || '').trim(),
+      tipo:  tipoEl ? tipoEl.textContent.trim() : '',
+      ruta:  rutaEl ? rutaEl.textContent.trim() : '',
+      total_usd:  +(sub * 1.13).toFixed(2),
       items,
-      created_at:  new Date().toISOString(),
+      created_at: new Date().toISOString(),
     };
 
     const btn = document.getElementById('btn-sek-save');
     if (btn) { btn.disabled = true; btn.textContent = 'Guardando...'; }
-
     try {
       await _sb('/cotizaciones_vendedor', {
         method: 'POST',
@@ -1945,251 +2269,185 @@ function generarPDF() {
         body: JSON.stringify(cot),
       });
       _toast('✅ Cotización guardada — ' + cot.id);
-    } catch(e) {
+    } catch (e) {
       alert('❌ Error al guardar: ' + e.message);
-    } finally {
-      if (btn) { btn.disabled = false; btn.innerHTML = '💾 Guardar'; }
     }
+    if (btn) { btn.disabled = false; btn.innerHTML = '💾 Guardar'; }
   }
 
   /* ══════════════════════════════════════════════════════════════
-     HISTORIAL DE COTIZACIONES
+     HISTORIAL
   ══════════════════════════════════════════════════════════════ */
   async function _verHistorial() {
-    const u = _getSession();
-    if (!u) return;
+    if (!_sess) return;
+    const u  = _sess.user;
+    const ov = document.getElementById('adminOverlay');
+    const ct = document.getElementById('adminContent');
+    if (!ov || !ct) return;
 
-    /* Reusar el overlay del admin para mostrar el historial */
-    const overlay = document.getElementById('adminOverlay');
-    const content = document.getElementById('adminContent');
-    if (!overlay || !content) return;
-
-    content.innerHTML = `
+    ct.innerHTML = `
       <button class="modal-close" onclick="document.getElementById('adminOverlay').classList.remove('open')">✕</button>
       <div class="modal-title">📂 Mis Cotizaciones — ${_esc(u.nombre)}</div>
       <div style="padding:2rem;text-align:center;color:var(--muted)">Cargando...</div>`;
-    overlay.classList.add('open');
+    ov.classList.add('open');
 
     try {
-      const cots = await _sb(
-        `/cotizaciones_vendedor?vendedor_id=eq.${encodeURIComponent(u.id)}&order=created_at.desc&limit=80`
-      );
-      _renderHistorial(content, cots || [], u);
-    } catch(e) {
-      content.querySelector('[style*="Cargando"]').textContent = '❌ Error: ' + e.message;
+      const cots = await _sb('/cotizaciones_vendedor?vendedor_id=eq.' + encodeURIComponent(u.id) + '&order=created_at.desc&limit=100');
+      _renderHist(ct, cots || [], u);
+    } catch (e) {
+      ct.querySelector('[style*="Cargando"]').textContent = '❌ ' + e.message;
     }
   }
 
-  function _renderHistorial(container, cots, u) {
+  function _renderHist(ct, cots, u) {
     if (!cots.length) {
-      container.querySelector('[style*="Cargando"]').innerHTML =
-        '<div style="font-size:3rem;margin-bottom:.5rem">📦</div><div>No hay cotizaciones guardadas aún.</div><div style="font-size:.76rem;margin-top:.3rem">Usá el botón 💾 Guardar para registrar una.</div>';
+      ct.innerHTML = `
+        <button class="modal-close" onclick="document.getElementById('adminOverlay').classList.remove('open')">✕</button>
+        <div class="modal-title">📂 Mis Cotizaciones — ${_esc(u.nombre)}</div>
+        <div style="padding:3rem;text-align:center;color:var(--muted)">
+          <div style="font-size:3rem;margin-bottom:.5rem">📦</div>
+          <div style="font-weight:600">Sin cotizaciones guardadas</div>
+          <div style="font-size:.76rem;margin-top:.4rem">Usá el botón 💾 Guardar para registrar una.</div>
+        </div>`;
       return;
     }
-
     const rows = cots.map(c => {
-      const fecha = new Date(c.created_at).toLocaleDateString('es-CR',{day:'2-digit',month:'2-digit',year:'numeric'});
-      const items = Array.isArray(c.items) ? c.items.length : '—';
-      return `
-        <tr style="border-bottom:1px solid var(--border)">
-          <td style="padding:.55rem .8rem;font-family:monospace;font-size:.74rem;color:var(--muted)">${_esc(c.id)}</td>
-          <td style="padding:.55rem .8rem;font-weight:500">${_esc(c.cliente||'—')}</td>
-          <td style="padding:.55rem .8rem;color:var(--muted)">${_esc(c.referencia||'—')}</td>
-          <td style="padding:.55rem .8rem;text-align:center;font-size:.78rem">${items}</td>
-          <td style="padding:.55rem .8rem;text-align:right;color:var(--success);font-family:monospace;font-weight:700">$${Number(c.total_usd||0).toFixed(2)}</td>
-          <td style="padding:.55rem .8rem;color:var(--muted);font-size:.76rem">${fecha}</td>
-          <td style="padding:.55rem .8rem;text-align:center">
-            <button onclick="_sekVerDetalle('${_esc(c.id)}')" style="background:rgba(79,142,247,.12);color:var(--blue);border:none;padding:2px 8px;border-radius:5px;font-size:.73rem;cursor:pointer">Ver</button>
-          </td>
-        </tr>`;
+      const f = new Date(c.created_at).toLocaleDateString('es-CR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+      const n = Array.isArray(c.items) ? c.items.length : '—';
+      return `<tr style="border-bottom:1px solid var(--border)">
+        <td style="padding:.5rem .75rem;font-family:monospace;font-size:.72rem;color:var(--muted)">${_esc(c.id)}</td>
+        <td style="padding:.5rem .75rem;font-weight:500">${_esc(c.cliente || '—')}</td>
+        <td style="padding:.5rem .75rem;color:var(--muted);font-size:.8rem">${_esc(c.referencia || '—')}</td>
+        <td style="padding:.5rem .75rem;text-align:center;font-size:.78rem">${n}</td>
+        <td style="padding:.5rem .75rem;text-align:right;color:var(--success);font-family:monospace;font-weight:700">$${Number(c.total_usd || 0).toFixed(2)}</td>
+        <td style="padding:.5rem .75rem;color:var(--muted);font-size:.74rem">${f}</td>
+        <td style="padding:.5rem .75rem;text-align:center">
+          <button onclick="_sekDet('${_esc(c.id)}')"
+            style="background:rgba(79,142,247,.12);color:var(--blue);border:none;padding:2px 8px;border-radius:5px;font-size:.72rem;cursor:pointer">Ver</button>
+        </td>
+      </tr>`;
     }).join('');
-
-    const totalGeneral = cots.reduce((s,c) => s + Number(c.total_usd||0), 0);
-
-    container.innerHTML = `
+    const tot = cots.reduce((s, c) => s + Number(c.total_usd || 0), 0);
+    ct.innerHTML = `
       <button class="modal-close" onclick="document.getElementById('adminOverlay').classList.remove('open')">✕</button>
       <div class="modal-title">📂 Mis Cotizaciones — ${_esc(u.nombre)}</div>
-      <div style="font-size:.78rem;color:var(--muted);margin-bottom:.9rem">${cots.length} cotización(es) · Total acumulado: <strong style="color:var(--success)">$${totalGeneral.toFixed(2)}</strong></div>
+      <div style="font-size:.78rem;color:var(--muted);margin-bottom:.9rem">
+        ${cots.length} cotización(es) · Total acumulado:
+        <strong style="color:var(--success)">$${tot.toFixed(2)}</strong>
+      </div>
       <div style="overflow-x:auto">
-        <table style="width:100%;border-collapse:collapse;font-size:.82rem;">
-          <thead>
-            <tr style="background:var(--surface2)">
-              <th style="padding:.5rem .8rem;text-align:left;border-bottom:1px solid var(--border);font-size:.65rem;text-transform:uppercase;letter-spacing:.07em;color:var(--muted)">ID</th>
-              <th style="padding:.5rem .8rem;text-align:left;border-bottom:1px solid var(--border);font-size:.65rem;text-transform:uppercase;letter-spacing:.07em;color:var(--muted)">Cliente</th>
-              <th style="padding:.5rem .8rem;text-align:left;border-bottom:1px solid var(--border);font-size:.65rem;text-transform:uppercase;letter-spacing:.07em;color:var(--muted)">Referencia</th>
-              <th style="padding:.5rem .8rem;text-align:center;border-bottom:1px solid var(--border);font-size:.65rem;text-transform:uppercase;letter-spacing:.07em;color:var(--muted)">Líneas</th>
-              <th style="padding:.5rem .8rem;text-align:right;border-bottom:1px solid var(--border);font-size:.65rem;text-transform:uppercase;letter-spacing:.07em;color:var(--muted)">Total</th>
-              <th style="padding:.5rem .8rem;text-align:left;border-bottom:1px solid var(--border);font-size:.65rem;text-transform:uppercase;letter-spacing:.07em;color:var(--muted)">Fecha</th>
-              <th style="padding:.5rem .8rem;border-bottom:1px solid var(--border)"></th>
-            </tr>
-          </thead>
+        <table style="width:100%;border-collapse:collapse;font-size:.81rem;">
+          <thead><tr style="background:var(--surface2)">
+            <th style="padding:.45rem .75rem;text-align:left;border-bottom:1px solid var(--border);font-size:.63rem;text-transform:uppercase;letter-spacing:.07em;color:var(--muted)">ID</th>
+            <th style="padding:.45rem .75rem;text-align:left;border-bottom:1px solid var(--border);font-size:.63rem;text-transform:uppercase;letter-spacing:.07em;color:var(--muted)">Cliente</th>
+            <th style="padding:.45rem .75rem;text-align:left;border-bottom:1px solid var(--border);font-size:.63rem;text-transform:uppercase;letter-spacing:.07em;color:var(--muted)">Referencia</th>
+            <th style="padding:.45rem .75rem;text-align:center;border-bottom:1px solid var(--border);font-size:.63rem;text-transform:uppercase;letter-spacing:.07em;color:var(--muted)">Líneas</th>
+            <th style="padding:.45rem .75rem;text-align:right;border-bottom:1px solid var(--border);font-size:.63rem;text-transform:uppercase;letter-spacing:.07em;color:var(--muted)">Total</th>
+            <th style="padding:.45rem .75rem;text-align:left;border-bottom:1px solid var(--border);font-size:.63rem;text-transform:uppercase;letter-spacing:.07em;color:var(--muted)">Fecha</th>
+            <th style="border-bottom:1px solid var(--border)"></th>
+          </tr></thead>
           <tbody>${rows}</tbody>
         </table>
       </div>`;
-
-    /* Guardar referencia de cots para el detalle */
     window._sekCots = cots;
   }
 
-  /* ── Ver detalle de una cotización ──────────────────────────── */
-  window._sekVerDetalle = function(id) {
-    const cots = window._sekCots || [];
-    const c = cots.find(x => x.id === id);
+  window._sekDet = function (id) {
+    const c = (window._sekCots || []).find(x => x.id === id);
     if (!c) return;
-
     const items = Array.isArray(c.items) ? c.items : [];
     const filas = items.map(i => `
       <tr style="border-bottom:1px solid var(--border)">
-        <td style="padding:.4rem .7rem;font-weight:500;font-size:.8rem">${_esc(i.modelo)}</td>
-        <td style="padding:.4rem .7rem;font-size:.75rem;color:var(--muted)">${_esc(i.marca||'')} · ${_esc(i.cat||'')}</td>
-        <td style="padding:.4rem .7rem;text-align:center">${i.qty}</td>
-        <td style="padding:.4rem .7rem;text-align:right;font-family:monospace;color:var(--blue)">$${Number(i.precio||0).toFixed(2)}</td>
-        <td style="padding:.4rem .7rem;text-align:right;font-family:monospace;font-weight:700;color:var(--success)">$${Number(i.total||0).toFixed(2)}</td>
+        <td style="padding:.38rem .65rem;font-weight:500;font-size:.79rem">${_esc(i.modelo)}</td>
+        <td style="padding:.38rem .65rem;font-size:.73rem;color:var(--muted)">${_esc((i.marca || '') + ' · ' + (i.cat || ''))}</td>
+        <td style="padding:.38rem .65rem;text-align:center">${i.qty}</td>
+        <td style="padding:.38rem .65rem;text-align:right;font-family:monospace;color:var(--blue)">$${Number(i.precio || 0).toFixed(2)}</td>
+        <td style="padding:.38rem .65rem;text-align:right;font-family:monospace;font-weight:700;color:var(--success)">$${Number(i.total || 0).toFixed(2)}</td>
       </tr>`).join('');
-
-    const fecha = new Date(c.created_at).toLocaleDateString('es-CR',{day:'2-digit',month:'long',year:'numeric'});
-    const content = document.getElementById('adminContent');
-    content.innerHTML = `
+    const fecha = new Date(c.created_at).toLocaleDateString('es-CR', { day: '2-digit', month: 'long', year: 'numeric' });
+    const ct = document.getElementById('adminContent');
+    ct.innerHTML = `
       <button class="modal-close" onclick="document.getElementById('adminOverlay').classList.remove('open')">✕</button>
       <div style="display:flex;align-items:center;gap:.7rem;margin-bottom:1rem">
-        <button class="btn btn-ghost btn-sm" onclick="_sekBackHistorial()">← Volver</button>
+        <button class="btn btn-ghost btn-sm" onclick="_sekBackHist()">← Volver</button>
         <div>
           <div class="modal-title" style="margin:0">${_esc(c.id)}</div>
-          <div style="font-size:.73rem;color:var(--muted);margin-top:2px">${fecha} · ${_esc(c.tipo||'')} · Ruta ${_esc(c.ruta||'')}</div>
+          <div style="font-size:.72rem;color:var(--muted);margin-top:2px">${fecha} · ${_esc(c.tipo || '')} · ${_esc(c.ruta || '')}</div>
         </div>
       </div>
-      ${c.cliente ? `<div style="margin-bottom:.6rem;font-size:.84rem"><strong>Cliente:</strong> ${_esc(c.cliente)}${c.referencia?' &nbsp;·&nbsp; <strong>Ref:</strong> '+_esc(c.referencia):''}</div>` : ''}
-      ${c.notas ? `<div style="margin-bottom:.6rem;font-size:.8rem;color:var(--muted);background:var(--surface2);padding:.5rem .8rem;border-radius:6px">📝 ${_esc(c.notas)}</div>` : ''}
+      ${c.cliente ? `<div style="margin-bottom:.5rem;font-size:.83rem"><strong>Cliente:</strong> ${_esc(c.cliente)}${c.referencia ? ' &nbsp;·&nbsp; <strong>Ref:</strong> ' + _esc(c.referencia) : ''}</div>` : ''}
+      ${c.notas ? `<div style="margin-bottom:.6rem;font-size:.78rem;color:var(--muted);background:var(--surface2);padding:.45rem .75rem;border-radius:6px">📝 ${_esc(c.notas)}</div>` : ''}
       <div style="overflow-x:auto">
-        <table style="width:100%;border-collapse:collapse;font-size:.81rem;">
-          <thead>
-            <tr style="background:var(--surface2)">
-              <th style="padding:.4rem .7rem;text-align:left;border-bottom:1px solid var(--border);font-size:.63rem;text-transform:uppercase;color:var(--muted)">Modelo</th>
-              <th style="padding:.4rem .7rem;text-align:left;border-bottom:1px solid var(--border);font-size:.63rem;text-transform:uppercase;color:var(--muted)">Categoría</th>
-              <th style="padding:.4rem .7rem;text-align:center;border-bottom:1px solid var(--border);font-size:.63rem;text-transform:uppercase;color:var(--muted)">Cant.</th>
-              <th style="padding:.4rem .7rem;text-align:right;border-bottom:1px solid var(--border);font-size:.63rem;text-transform:uppercase;color:var(--muted)">Precio</th>
-              <th style="padding:.4rem .7rem;text-align:right;border-bottom:1px solid var(--border);font-size:.63rem;text-transform:uppercase;color:var(--muted)">Total</th>
-            </tr>
-          </thead>
-          <tbody>${filas || '<tr><td colspan="5" style="padding:1rem;text-align:center;color:var(--muted)">Sin detalle de items</td></tr>'}</tbody>
+        <table style="width:100%;border-collapse:collapse;font-size:.8rem;">
+          <thead><tr style="background:var(--surface2)">
+            <th style="padding:.38rem .65rem;text-align:left;border-bottom:1px solid var(--border);font-size:.62rem;text-transform:uppercase;color:var(--muted)">Modelo</th>
+            <th style="padding:.38rem .65rem;text-align:left;border-bottom:1px solid var(--border);font-size:.62rem;text-transform:uppercase;color:var(--muted)">Categoría</th>
+            <th style="padding:.38rem .65rem;text-align:center;border-bottom:1px solid var(--border);font-size:.62rem;text-transform:uppercase;color:var(--muted)">Cant.</th>
+            <th style="padding:.38rem .65rem;text-align:right;border-bottom:1px solid var(--border);font-size:.62rem;text-transform:uppercase;color:var(--muted)">P. Unit.</th>
+            <th style="padding:.38rem .65rem;text-align:right;border-bottom:1px solid var(--border);font-size:.62rem;text-transform:uppercase;color:var(--muted)">Total</th>
+          </tr></thead>
+          <tbody>${filas || '<tr><td colspan="5" style="padding:1rem;text-align:center;color:var(--muted)">Sin detalle</td></tr>'}</tbody>
         </table>
       </div>
-      <div style="margin-top:.9rem;padding-top:.75rem;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:1.5rem">
+      <div style="margin-top:.9rem;padding-top:.7rem;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:1.5rem">
         <div style="text-align:right">
-          <div style="font-size:.65rem;text-transform:uppercase;color:var(--muted);letter-spacing:.07em">Subtotal</div>
-          <div style="font-family:monospace;font-weight:600">$${(Number(c.total_usd||0)/1.13).toFixed(2)}</div>
+          <div style="font-size:.62rem;text-transform:uppercase;color:var(--muted);letter-spacing:.07em">Subtotal</div>
+          <div style="font-family:monospace;font-weight:600">$${(Number(c.total_usd || 0) / 1.13).toFixed(2)}</div>
         </div>
         <div style="text-align:right">
-          <div style="font-size:.65rem;text-transform:uppercase;color:var(--muted);letter-spacing:.07em">Total con IVA</div>
-          <div style="font-family:monospace;font-weight:800;font-size:1.2rem;color:var(--success)">$${Number(c.total_usd||0).toFixed(2)}</div>
+          <div style="font-size:.62rem;text-transform:uppercase;color:var(--muted);letter-spacing:.07em">Total con IVA 13%</div>
+          <div style="font-family:monospace;font-weight:800;font-size:1.2rem;color:var(--success)">$${Number(c.total_usd || 0).toFixed(2)}</div>
         </div>
       </div>`;
   };
 
-  window._sekBackHistorial = async function() {
-    const u = _getSession();
+  window._sekBackHist = async function () {
+    const u = _sess?.user;
     if (!u) return;
-    const overlay = document.getElementById('adminOverlay');
-    const content = document.getElementById('adminContent');
-    content.innerHTML = `
+    const ct = document.getElementById('adminContent');
+    ct.innerHTML = `
       <button class="modal-close" onclick="document.getElementById('adminOverlay').classList.remove('open')">✕</button>
       <div class="modal-title">📂 Mis Cotizaciones — ${_esc(u.nombre)}</div>
       <div style="padding:2rem;text-align:center;color:var(--muted)">Cargando...</div>`;
     try {
-      const cots = await _sb(`/cotizaciones_vendedor?vendedor_id=eq.${encodeURIComponent(u.id)}&order=created_at.desc&limit=80`);
-      _renderHistorial(content, cots || [], u);
-    } catch(e) {}
+      const cots = await _sb('/cotizaciones_vendedor?vendedor_id=eq.' + encodeURIComponent(u.id) + '&order=created_at.desc&limit=100');
+      _renderHist(ct, cots || [], u);
+    } catch (e) {}
   };
 
-  /* ── Toast ───────────────────────────────────────────────────── */
+  /* ── Toast & Escape ──────────────────────────────────────────── */
   function _toast(msg, color) {
+    if (typeof mostrarToast === 'function') { mostrarToast(msg); return; }
     const t = document.getElementById('toast');
     if (!t) return;
-    t.textContent = msg;
-    t.style.background = color || '#22c55e';
+    t.textContent = msg; t.style.background = color || '#22c55e';
     t.classList.add('visible');
     setTimeout(() => t.classList.remove('visible'), 3000);
   }
 
-  /* ── Escape HTML ─────────────────────────────────────────────── */
   function _esc(s) {
-    return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
 
   /* ══════════════════════════════════════════════════════════════
-     OVERRIDE hacerLogin() — reemplaza el original con Supabase
+     INIT
   ══════════════════════════════════════════════════════════════ */
-  window.hacerLogin = async function() {
-    const user = document.getElementById('loginUser').value.trim().toLowerCase();
-    const pass = document.getElementById('loginPass').value;
-    const err  = document.getElementById('loginErr');
-    const btn  = document.getElementById('loginBtn');
-    const spin = document.getElementById('loginSpinner');
-
-    err.textContent = '';
-    if (!user || !pass) { err.textContent = 'Ingresá tu usuario y contraseña.'; return; }
-
-    btn.disabled = true;
-    btn.style.display = 'none';
-    spin.style.display = 'block';
-
-    try {
-      const hash  = await _hash(pass);
-      const users = await _sb(`/usuarios?username=eq.${encodeURIComponent(user)}&pass_hash=eq.${encodeURIComponent(hash)}&select=*`);
-
-      if (!users || users.length === 0) {
-        err.textContent = 'Usuario o contraseña incorrectos.';
-        btn.disabled = false; btn.style.display = 'block'; spin.style.display = 'none';
-        document.getElementById('loginPass').value = '';
-        document.getElementById('loginPass').focus();
-        return;
-      }
-
-      const u = { id: users[0].id, nombre: users[0].nombre, username: users[0].username, role: users[0].role };
-      _setSession(u);
-      /* Actualizar también la variable global que usa el resto de la app */
-      window.usuarioActivo = { usuario: u.username, nombre: u.nombre, clave: '' };
-      _enterApp(u);
-
-    } catch(e) {
-      err.textContent = '⚠ Error de conexión: ' + e.message;
-      btn.disabled = false; btn.style.display = 'block'; spin.style.display = 'none';
+  function _init() {
+    /* Restaurar sesión de sessionStorage */
+    if (_loadSession()) {
+      _enterApp();
+      return;
     }
-  };
+    /* Sin sesión → construir overlay */
+    _buildOverlay();
+    const ov = document.getElementById('loginOverlay');
+    if (ov) ov.classList.remove('oculto');
+  }
 
-  /* ══════════════════════════════════════════════════════════════
-     OVERRIDE cerrarSesion()
-  ══════════════════════════════════════════════════════════════ */
-  window.cerrarSesion = function() {
-    if (!confirm('¿Cerrar sesión?')) return;
-    sessionStorage.removeItem(SESSION);
-    _session = null;
-    window.usuarioActivo = null;
-    document.getElementById('loginOverlay').classList.remove('oculto');
-    document.getElementById('sessionBar').style.display = 'none';
-    document.getElementById('loginUser').value = '';
-    document.getElementById('loginPass').value = '';
-    document.getElementById('loginErr').textContent = '';
-    document.getElementById('loginBtn').disabled = false;
-    document.getElementById('loginBtn').style.display = 'block';
-    document.getElementById('loginSpinner').style.display = 'none';
-    /* Quitar botones del header */
-    document.getElementById('btn-sek-save')?.remove();
-    document.getElementById('btn-sek-historial')?.remove();
-    document.getElementById('loginUser').focus();
-  };
-
-  /* ── Restaurar sesión desde sessionStorage al recargar ────────── */
-  const saved = sessionStorage.getItem(SESSION);
-  if (saved) {
-    try {
-      const u = JSON.parse(saved);
-      _session = u;
-      window.usuarioActivo = { usuario: u.username, nombre: u.nombre, clave: '' };
-      document.addEventListener('DOMContentLoaded', () => _enterApp(u));
-      /* Si el DOM ya cargó */
-      if (document.readyState !== 'loading') _enterApp(u);
-    } catch(e) { sessionStorage.removeItem(SESSION); }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', _init);
+  } else {
+    _init();
   }
 
 })();
