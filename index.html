@@ -1909,16 +1909,15 @@ function generarPDF() {
   <div id="pnl-register" style="display:none">
     <div class="login-title" style="margin-bottom:.9rem">Crear Cuenta</div>
     <div style="font-size:.76rem;color:#5a6480;margin-bottom:.9rem;line-height:1.5;background:rgba(224,92,10,.08);border:1px solid rgba(224,92,10,.2);padding:.55rem .75rem;border-radius:8px;">
-      🔒 Solo cuentas <strong style="color:#e05c0a">@sekunet.com</strong> pueden registrarse.<br>
-      Recibirás un código de 6 dígitos en tu correo para confirmar tu identidad.
+      🔒 Solo cuentas <strong style="color:#e05c0a">@sekunet.com</strong> pueden registrarse.
     </div>
     <div class="login-field">
       <label>Nombre completo</label>
-      <input type="text" id="rf-nombre" placeholder="Ej: Carolina Chavarria" autocomplete="name">
+      <input type="text" id="rf-nombre" placeholder="Tu nombre completo" autocomplete="name">
     </div>
     <div class="login-field">
       <label>Correo corporativo</label>
-      <input type="email" id="rf-email" placeholder="cchavarria@sekunet.com" autocomplete="email">
+      <input type="email" id="rf-email" placeholder="usuario@sekunet.com" autocomplete="email">
     </div>
     <div class="login-field">
       <label>Contraseña</label>
@@ -1931,7 +1930,7 @@ function generarPDF() {
     </div>
     <div class="login-err" id="rf-err"></div>
     <div class="login-spinner" id="rf-spin"></div>
-    <button class="login-btn" id="rf-btn" onclick="_sekRegistrar()">Crear Cuenta y Enviar Código</button>
+    <button class="login-btn" id="rf-btn" onclick="_sekRegistrar()">Crear Cuenta</button>
     <div style="text-align:center;margin-top:.75rem">
       <button onclick="_sekShowPanel('pnl-login')"
         style="background:none;border:none;color:#5a6480;font-size:.78rem;cursor:pointer">
@@ -2023,33 +2022,12 @@ function generarPDF() {
 
     btn.disabled = true; spin.style.display = 'block';
     try {
-      /* Paso 1: verificar contraseña */
-      await _auth('/token?grant_type=password', { email, password: pass });
-
-      /* Paso 2: enviar código OTP al correo (2FA) */
-      await _auth('/otp', { email, options: { shouldCreateUser: false } });
-
-      /* Mostrar panel de verificación con mensaje de 2FA */
-      _pendEmail   = email;
-      _verifyType  = 'email';
-      document.getElementById('vf-email-show').textContent = email;
-      document.getElementById('vf-title').textContent = '🔐 Verificación de Acceso';
-      document.getElementById('vf-msg').textContent   = 'Por seguridad, enviamos un código de 6 dígitos a';
-      const codeInp = document.getElementById('vf-code');
-      if (codeInp) codeInp.value = '';
-      _sekShowPanel('pnl-verify');
-
+      const data = await _auth('/token?grant_type=password', { email, password: pass });
+      _saveSession(data);
+      _enterApp();
     } catch (e) {
       const msg = e.message.toLowerCase();
-      if (msg.includes('confirm') || msg.includes('verif') || msg.includes('not confirmed')) {
-        errEl.textContent = '⚠ Tu cuenta no está verificada. Revisá tu correo para el código inicial.';
-        _pendEmail  = email;
-        _verifyType = 'signup';
-        document.getElementById('vf-email-show').textContent = email;
-        document.getElementById('vf-title').textContent = 'Verificá tu Correo';
-        document.getElementById('vf-msg').textContent   = 'Te enviamos un código de 6 dígitos a';
-        setTimeout(() => _sekShowPanel('pnl-verify'), 1800);
-      } else if (msg.includes('invalid') || msg.includes('credentials') || msg.includes('password')) {
+      if (msg.includes('invalid') || msg.includes('credentials') || msg.includes('password')) {
         errEl.textContent = 'Correo o contraseña incorrectos.';
       } else {
         errEl.textContent = e.message;
@@ -2079,16 +2057,17 @@ function generarPDF() {
 
     btn.disabled = true; spin.style.display = 'block';
     try {
-      await _auth('/signup', { email, password: pass, data: { nombre } });
-      _pendEmail  = email;
-      _pendNombre = nombre;
-      _verifyType = 'signup';
-      document.getElementById('vf-email-show').textContent = email;
-      document.getElementById('vf-title').textContent = 'Verificá tu Correo';
-      document.getElementById('vf-msg').textContent   = 'Te enviamos un código de 6 dígitos a';
-      const codeInp = document.getElementById('vf-code');
-      if (codeInp) codeInp.value = '';
-      _sekShowPanel('pnl-verify');
+      const data = await _auth('/signup', { email, password: pass, data: { nombre } });
+      /* Si email confirmations está desactivado, devuelve sesión directa */
+      if (data.access_token) {
+        _saveSession(data);
+        _enterApp();
+      } else {
+        /* Fallback: pedir que inicie sesión */
+        errEl.style.color = '#22c55e';
+        errEl.textContent = '✅ Cuenta creada. Iniciá sesión con tus datos.';
+        setTimeout(() => { errEl.style.color = ''; _sekShowPanel('pnl-login'); }, 2000);
+      }
     } catch (e) {
       const msg = e.message.toLowerCase();
       if (msg.includes('already') || msg.includes('exists') || msg.includes('registered')) {
