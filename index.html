@@ -51,21 +51,21 @@ select option{background:var(--surface2);color:var(--text);}
 
 /* TABS */
 .tab-row{display:grid;grid-template-columns:1fr 1fr;gap:6px;}
-.tab-btn{background:var(--surface2);border:2px solid var(--border);border-radius:10px;padding:.6rem .4rem;cursor:pointer;text-align:center;transition:all .2s;font-family:inherit;}
+.tab-btn{background:var(--surface2);border:2px solid var(--border);border-radius:8px;padding:.35rem .25rem;cursor:pointer;text-align:center;transition:all .2s;font-family:inherit;}
 .tab-btn.active{border-color:var(--accent);background:rgba(230,60,47,.09);}
-.tab-icon{font-size:1.15rem;display:block;margin-bottom:2px;}
-.tab-name{font-size:.76rem;font-weight:600;color:var(--text);}
+.tab-icon{font-size:.9rem;display:block;margin-bottom:1px;}
+.tab-name{font-size:.7rem;font-weight:600;color:var(--text);}
 .tab-btn.active .tab-name{color:var(--accent);}
-.tab-desc{font-size:.64rem;color:var(--muted);margin-top:1px;}
+.tab-desc{font-size:.6rem;color:var(--muted);margin-top:1px;}
 
 /* ROUTE */
 .route-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;}
-.route-card{background:var(--surface2);border:2px solid var(--border);border-radius:10px;padding:.6rem .3rem;cursor:pointer;text-align:center;transition:all .2s;font-family:inherit;}
+.route-card{background:var(--surface2);border:2px solid var(--border);border-radius:8px;padding:.35rem .2rem;cursor:pointer;text-align:center;transition:all .2s;font-family:inherit;}
 .route-card.active{border-color:var(--blue);background:rgba(79,142,247,.09);}
-.route-icon{font-size:1.05rem;display:block;margin-bottom:1px;}
-.route-name{font-size:.72rem;font-weight:600;color:var(--text);}
+.route-icon{font-size:.85rem;display:block;margin-bottom:1px;}
+.route-name{font-size:.67rem;font-weight:600;color:var(--text);}
 .route-card.active .route-name{color:var(--blue);}
-.route-time{font-size:.62rem;color:var(--muted);margin-top:2px;}
+.route-time{font-size:.58rem;color:var(--muted);margin-top:1px;}
 
 /* REGISTRO */
 .reg-row{display:grid;grid-template-columns:1fr 1fr;gap:6px;}
@@ -110,7 +110,7 @@ select option{background:var(--surface2);color:var(--text);}
 .btn-sm{padding:.32rem .66rem;font-size:.75rem;}
 
 /* TABLE */
-.tbl-wrap{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;box-shadow:0 2px 8px var(--shadow);}
+.tbl-wrap{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;box-shadow:0 2px 8px var(--shadow);flex-shrink:0;}
 table{width:100%;border-collapse:collapse;font-size:.82rem;}
 thead th{background:var(--surface2);padding:.6rem .9rem;text-align:left;font-size:.63rem;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);}
 tbody tr{border-bottom:1px solid var(--border);transition:background .12s;}
@@ -1282,7 +1282,7 @@ function renderMargins(body){
       <input type="number" step="0.5" min="0" max="200"
         placeholder="${MARGINS.global}%"
         value="${MARGINS.byCat[c]!==null?MARGINS.byCat[c]:''}"
-        onchange="MARGINS.byCat['${c}']=this.value===''?null:parseFloat(this.value);renderTable();"/>
+        onchange="MARGINS.byCat['${c}']=this.value===''?null:parseFloat(this.value);renderTable();guardarConfig();"/>
       <span class="margin-pct">%</span>
     </div>`).join('');
   body.innerHTML=`
@@ -1657,63 +1657,98 @@ function mostrarToast(msg, color) {
 }
 
 // ══════════════════════════════════════════════════════════
-// LOCAL STORAGE
+// CONFIG — LOCAL STORAGE + NUBE (Supabase)
 // ══════════════════════════════════════════════════════════
-const LS_KEY = 'sekunet_config_v1';
+const LS_KEY       = 'sekunet_config_v1';
+const _CFG_SB_URL  = 'https://loldcmqaklfpmvnxkxbu.supabase.co';
+const _CFG_SB_KEY  = 'sb_publishable_8bgwyL4KMc2wNwLqnVaV4A_9RbdgW_K';
+
+/* Aplica un objeto de config a las variables globales */
+function _aplicarConfig(cfg) {
+  if (cfg.factores) {
+    ['distribucion','proyecto'].forEach(lista => {
+      if (cfg.factores[lista]) {
+        ['aereo','maritimo','terrestre'].forEach(r => {
+          if (cfg.factores[lista][r]) F[lista][r] = cfg.factores[lista][r];
+        });
+      }
+    });
+  }
+  if (cfg.margenes) {
+    if (cfg.margenes.global != null) MARGINS.global = cfg.margenes.global;
+    if (cfg.margenes.byList)         MARGINS.byList = cfg.margenes.byList;
+    if (cfg.margenes.byCat)          Object.assign(MARGINS.byCat, cfg.margenes.byCat);
+  }
+  if (cfg.usuarios && cfg.usuarios.length > 0) {
+    USUARIOS.length = 0;
+    cfg.usuarios.forEach(u => USUARIOS.push(u));
+  }
+  if (cfg.tiempos) {
+    ['aereo','maritimo','terrestre'].forEach(r => {
+      if (cfg.tiempos[r]) Object.assign(DELIVERY[r], cfg.tiempos[r]);
+    });
+  }
+}
+
+/* Guarda config en Supabase (upsert, fire-and-forget) */
+async function _guardarConfigNube(cfg) {
+  try {
+    const r = await fetch(_CFG_SB_URL + '/rest/v1/sekunet_config', {
+      method: 'POST',
+      headers: {
+        'apikey': _CFG_SB_KEY,
+        'Authorization': 'Bearer ' + _CFG_SB_KEY,
+        'Content-Type': 'application/json',
+        'Prefer': 'resolution=merge-duplicates'
+      },
+      body: JSON.stringify({ id: 'global', data: cfg, updated_at: new Date().toISOString() })
+    });
+    if (!r.ok) console.warn('Cloud config save HTTP ' + r.status);
+  } catch(e) { console.warn('Error guardando config en nube:', e.message); }
+}
+
+/* Carga config desde Supabase y la aplica */
+async function _cargarConfigNube() {
+  try {
+    const r = await fetch(_CFG_SB_URL + '/rest/v1/sekunet_config?id=eq.global&select=data', {
+      headers: { 'apikey': _CFG_SB_KEY, 'Authorization': 'Bearer ' + _CFG_SB_KEY }
+    });
+    if (!r.ok) return;
+    const rows = await r.json();
+    if (!rows.length || !rows[0].data || !Object.keys(rows[0].data).length) return;
+    const cfg = rows[0].data;
+    _aplicarConfig(cfg);
+    try { localStorage.setItem(LS_KEY, JSON.stringify(cfg)); } catch(e) {}
+    renderTable();
+    renderResults();
+  } catch(e) { console.warn('Error cargando config de nube:', e.message); }
+}
 
 function guardarConfig() {
-  try {
-    localStorage.setItem(LS_KEY, JSON.stringify({
-      factores: F,
-      margenes: { global: MARGINS.global, byList: MARGINS.byList, byCat: MARGINS.byCat },
-      usuarios: USUARIOS,
-      tiempos: DELIVERY
-    }));
-  } catch(e) { console.warn('localStorage error:', e.message); }
+  const cfg = {
+    factores: F,
+    margenes: { global: MARGINS.global, byList: MARGINS.byList, byCat: MARGINS.byCat },
+    usuarios: USUARIOS,
+    tiempos: DELIVERY
+  };
+  try { localStorage.setItem(LS_KEY, JSON.stringify(cfg)); } catch(e) { console.warn('localStorage error:', e.message); }
+  _guardarConfigNube(cfg); // async, sin bloquear
 }
 
 function cargarConfig() {
+  // 1) Carga local inmediata (síncrona, sin latencia)
   try {
     const raw = localStorage.getItem(LS_KEY);
-    if (!raw) return;
-    const cfg = JSON.parse(raw);
-
-    // Factores
-    if (cfg.factores) {
-      ['distribucion','proyecto'].forEach(lista => {
-        if (cfg.factores[lista]) {
-          ['aereo','maritimo','terrestre'].forEach(r => {
-            if (cfg.factores[lista][r]) F[lista][r] = cfg.factores[lista][r];
-          });
-        }
-      });
-    }
-
-    // Márgenes
-    if (cfg.margenes) {
-      if (cfg.margenes.global != null) MARGINS.global = cfg.margenes.global;
-      if (cfg.margenes.byList) MARGINS.byList = cfg.margenes.byList;
-      if (cfg.margenes.byCat) Object.assign(MARGINS.byCat, cfg.margenes.byCat);
-    }
-
-    // Usuarios
-    if (cfg.usuarios && cfg.usuarios.length > 0) {
-      USUARIOS.length = 0;
-      cfg.usuarios.forEach(u => USUARIOS.push(u));
-    }
-
-    // Tiempos de entrega
-    if (cfg.tiempos) {
-      ['aereo','maritimo','terrestre'].forEach(r => {
-        if (cfg.tiempos[r]) Object.assign(DELIVERY[r], cfg.tiempos[r]);
-      });
-    }
-  } catch(e) { console.warn('Error cargando config:', e.message); }
+    if (raw) _aplicarConfig(JSON.parse(raw));
+  } catch(e) { console.warn('Error cargando config local:', e.message); }
+  // 2) Carga desde nube (asíncrona, sobreescribe si hay config guardada)
+  _cargarConfigNube();
 }
 
 function borrarConfig() {
   if (!confirm('¿Restablecer TODA la configuración a los valores por defecto?\nSe borrarán factores, márgenes, usuarios y tiempos guardados.')) return;
   localStorage.removeItem(LS_KEY);
+  _guardarConfigNube({}); // limpiar nube también
   mostrarToast('🔄 Configuración restablecida', '#e05c0a');
   setTimeout(() => location.reload(), 1000);
 }
@@ -1822,9 +1857,14 @@ function generarPDF() {
   async function _auth(path, body, token) {
     const h = { ..._baseHdrs };
     if (token) h['Authorization'] = 'Bearer ' + token;
-    const r = await fetch(SB_URL + '/auth/v1' + path, {
-      method: 'POST', headers: h, body: JSON.stringify(body),
-    });
+    let r;
+    try {
+      r = await fetch(SB_URL + '/auth/v1' + path, {
+        method: 'POST', headers: h, body: JSON.stringify(body),
+      });
+    } catch (e) {
+      throw new Error('Sin conexión. Verificá tu internet e intentá de nuevo.');
+    }
     const d = await r.json();
     if (!r.ok) throw new Error(d.msg || d.error_description || d.message || 'Error ' + r.status);
     return d;
@@ -1834,9 +1874,14 @@ function generarPDF() {
   async function _sb(path, opts = {}) {
     const h = { ..._baseHdrs };
     if (_sess?.access_token) h['Authorization'] = 'Bearer ' + _sess.access_token;
-    const r = await fetch(SB_URL + '/rest/v1' + path, {
-      ...opts, headers: { ...h, ...(opts.headers || {}) },
-    });
+    let r;
+    try {
+      r = await fetch(SB_URL + '/rest/v1' + path, {
+        ...opts, headers: { ...h, ...(opts.headers || {}) },
+      });
+    } catch (e) {
+      throw new Error('Sin conexión. Verificá tu internet e intentá de nuevo.');
+    }
     if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.message || 'HTTP ' + r.status); }
     return r.status === 204 ? null : r.json();
   }
