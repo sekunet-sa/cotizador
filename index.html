@@ -754,9 +754,8 @@ let F = {
 };
 
 const CATEGORIES = ["Access Control Products", "Accessories", "Alarm Cable", "Alarm Products", "Audio Products", "Backend Products", "Backup UPS", "Cabinet", "Cameras Products", "Coaxial Cable", "Display and Control", "Fiber Optics", "Fire Products", "ITS Products", "Interactive Flat Panel Display", "LED Display", "Monitor", "Network cable", "Networking", "Onboard Security", "Online UPS", "PDA Terminal", "PDS Accessories", "Parking Management", "Patchcord,Balun,Plug", "Portable Products", "Radar Products", "Security Inspection Products", "Sensing Products", "Server Products", "Software", "Speed Gates and Turnstiles", "Thermal Products", "Video Intercom Products"];
-let MARGINS = { global:20, byList:{distribucion:22,proyecto:20}, byCat:{} };
-const _CAT_DEF={'Backup UPS':18,'Coaxial Cable':18,'Interactive Flat Panel Display':22,'LED Display':22,'Monitor':22};
-CATEGORIES.forEach(c=>{ MARGINS.byCat[c]=_CAT_DEF[c]??null; });
+let MARGINS = { global:25, byList:{distribucion:22,proyecto:20}, byCat:{} };
+CATEGORIES.forEach(c=>{ MARGINS.byCat[c]=30; });
 
 function getMargin(item){
   const bc=MARGINS.byCat[item.cat];
@@ -1447,7 +1446,6 @@ let USUARIOS = [
   { usuario: 'nezpinoza',   clave: 'Sekunet2026', nombre: 'Nicole Espinoza' },
   { usuario: 'ezambrano',   clave: 'Sekunet2026', nombre: 'Eliza Zambrano' },
   { usuario: 'mcastro',   clave: 'Sekunet2026', nombre: 'Mariano Castro' },
-  { usuario: 'calvarado', clave: 'Sekunet2026',   nombre: 'Christopher Alvarado' },
   { usuario: 'admin',     clave: 'AdminSek2025!', nombre: 'Administrador' },
 ];
 
@@ -1797,4 +1795,403 @@ function generarPDF() {
 }
 </script>
 
+<script>
+/* ══════════════════════════════════════════════════════════════════
+   SUPABASE INTEGRATION — Auth + Guardar Cotizaciones
+   Versión: 1.0 · Sekunet S.A.
+   IMPORTANTE: Este bloque va al final del archivo, antes de </body>
+   y REEMPLAZA el login con autenticación via Supabase.
+   Los usuarios se gestionan desde el Cotizador PM.
+══════════════════════════════════════════════════════════════════ */
+(function() {
+  'use strict';
+
+  /* ── Config Supabase ─────────────────────────────────────────── */
+  const SB_URL  = 'https://loldcmqaklfpmvnxkxbu.supabase.co';
+  const SB_KEY  = 'sb_publishable_8bgwyL4KMc2wNwLqnVaV4A_9RbdgW_K';
+  const SALT    = 'sekunet_qp_2026';
+  const SESSION = 'sek_vendedor_v1';
+
+  const _hdrs = {
+    'apikey':        SB_KEY,
+    'Authorization': `Bearer ${SB_KEY}`,
+    'Content-Type':  'application/json',
+  };
+
+  /* ── Helpers ─────────────────────────────────────────────────── */
+  async function _hash(pass) {
+    const enc = new TextEncoder();
+    const buf = await crypto.subtle.digest('SHA-256', enc.encode(pass + SALT));
+    return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
+  }
+
+  async function _sb(path, opts = {}) {
+    const r = await fetch(`${SB_URL}/rest/v1${path}`, {
+      ...opts,
+      headers: { ..._hdrs, ...(opts.headers || {}) },
+    });
+    if (!r.ok) {
+      const e = await r.json().catch(() => ({}));
+      throw new Error(e.message || `HTTP ${r.status}`);
+    }
+    return r.status === 204 ? null : r.json();
+  }
+
+  function _genId() {
+    return 'COT-' + Date.now().toString(36).toUpperCase() + Math.random().toString(36).slice(2,5).toUpperCase();
+  }
+
+  /* ── Estado de sesión ────────────────────────────────────────── */
+  let _session = null;
+
+  function _setSession(u) {
+    _session = u;
+    sessionStorage.setItem(SESSION, JSON.stringify(u));
+  }
+
+  function _getSession() {
+    if (_session) return _session;
+    try { _session = JSON.parse(sessionStorage.getItem(SESSION)); } catch(e) {}
+    return _session;
+  }
+
+  /* ── Mostrar app tras login ──────────────────────────────────── */
+  function _enterApp(u) {
+    document.getElementById('loginOverlay').classList.add('oculto');
+    const bar = document.getElementById('sessionBar');
+    if (bar) {
+      bar.style.display = 'flex';
+      const el = document.getElementById('sessionUser');
+      if (el) el.textContent = u.nombre;
+      const te = document.getElementById('sessionTime');
+      if (te) te.textContent = 'Ingreso: ' + new Date().toLocaleString('es-CR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
+    }
+    const asesorEl = document.getElementById('clientContact');
+    if (asesorEl && !asesorEl.value) asesorEl.value = u.nombre;
+    _addHeaderButtons();
+  }
+
+  /* ── Botones en header ───────────────────────────────────────── */
+  function _addHeaderButtons() {
+    if (document.getElementById('btn-sek-historial')) return;
+    const hdr = document.querySelector('.hdr-right');
+    if (!hdr) return;
+
+    const btnHist = document.createElement('button');
+    btnHist.id = 'btn-sek-historial';
+    btnHist.className = 'btn btn-ghost btn-sm';
+    btnHist.innerHTML = '📂 Mis Cots.';
+    btnHist.addEventListener('click', _verHistorial);
+    hdr.insertBefore(btnHist, hdr.firstChild);
+
+    const btnSave = document.createElement('button');
+    btnSave.id = 'btn-sek-save';
+    btnSave.className = 'btn btn-green btn-sm';
+    btnSave.innerHTML = '💾 Guardar';
+    btnSave.style.marginLeft = '4px';
+    btnSave.addEventListener('click', _guardarCotizacion);
+    hdr.insertBefore(btnSave, btnHist.nextSibling);
+  }
+
+  /* ══════════════════════════════════════════════════════════════
+     GUARDAR COTIZACIÓN
+  ══════════════════════════════════════════════════════════════ */
+  async function _guardarCotizacion() {
+    const u = _getSession();
+    if (!u) { alert('No hay sesión activa.'); return; }
+
+    /* Recopilar items desde el estado global de la app */
+    const items = (typeof quoteItems !== 'undefined' ? quoteItems : []).map(item => {
+      const pv = typeof getSalePrice === 'function' ? getSalePrice(item) : 0;
+      return {
+        modelo:  item.modelo,
+        marca:   item.marca,
+        cat:     item.cat,
+        qty:     item.qty,
+        precio:  +pv.toFixed(4),
+        total:   +(pv * item.qty).toFixed(4),
+      };
+    });
+
+    const sub = items.reduce((s, i) => s + i.total, 0);
+    const total_usd = +(sub * 1.13).toFixed(2);
+
+    /* Tipo de lista y ruta activos */
+    const tipoEl  = document.querySelector('.tab-btn.active .tab-name');
+    const rutaEl  = document.querySelector('.route-card.active .route-name');
+
+    const cot = {
+      id:              _genId(),
+      vendedor_id:     u.id,
+      vendedor_nombre: u.nombre,
+      cliente:     document.getElementById('clientName')?.value?.trim()    || '',
+      contacto:    document.getElementById('clientContact')?.value?.trim() || '',
+      referencia:  document.getElementById('clientRef')?.value?.trim()     || '',
+      notas:       document.getElementById('notes')?.value?.trim()         || '',
+      tipo:        tipoEl  ? tipoEl.textContent.trim()  : '',
+      ruta:        rutaEl  ? rutaEl.textContent.trim()  : '',
+      total_usd,
+      items,
+      created_at:  new Date().toISOString(),
+    };
+
+    const btn = document.getElementById('btn-sek-save');
+    if (btn) { btn.disabled = true; btn.textContent = 'Guardando...'; }
+
+    try {
+      await _sb('/cotizaciones_vendedor', {
+        method: 'POST',
+        headers: { 'Prefer': 'return=minimal' },
+        body: JSON.stringify(cot),
+      });
+      _toast('✅ Cotización guardada — ' + cot.id);
+    } catch(e) {
+      alert('❌ Error al guardar: ' + e.message);
+    } finally {
+      if (btn) { btn.disabled = false; btn.innerHTML = '💾 Guardar'; }
+    }
+  }
+
+  /* ══════════════════════════════════════════════════════════════
+     HISTORIAL DE COTIZACIONES
+  ══════════════════════════════════════════════════════════════ */
+  async function _verHistorial() {
+    const u = _getSession();
+    if (!u) return;
+
+    /* Reusar el overlay del admin para mostrar el historial */
+    const overlay = document.getElementById('adminOverlay');
+    const content = document.getElementById('adminContent');
+    if (!overlay || !content) return;
+
+    content.innerHTML = `
+      <button class="modal-close" onclick="document.getElementById('adminOverlay').classList.remove('open')">✕</button>
+      <div class="modal-title">📂 Mis Cotizaciones — ${_esc(u.nombre)}</div>
+      <div style="padding:2rem;text-align:center;color:var(--muted)">Cargando...</div>`;
+    overlay.classList.add('open');
+
+    try {
+      const cots = await _sb(
+        `/cotizaciones_vendedor?vendedor_id=eq.${encodeURIComponent(u.id)}&order=created_at.desc&limit=80`
+      );
+      _renderHistorial(content, cots || [], u);
+    } catch(e) {
+      content.querySelector('[style*="Cargando"]').textContent = '❌ Error: ' + e.message;
+    }
+  }
+
+  function _renderHistorial(container, cots, u) {
+    if (!cots.length) {
+      container.querySelector('[style*="Cargando"]').innerHTML =
+        '<div style="font-size:3rem;margin-bottom:.5rem">📦</div><div>No hay cotizaciones guardadas aún.</div><div style="font-size:.76rem;margin-top:.3rem">Usá el botón 💾 Guardar para registrar una.</div>';
+      return;
+    }
+
+    const rows = cots.map(c => {
+      const fecha = new Date(c.created_at).toLocaleDateString('es-CR',{day:'2-digit',month:'2-digit',year:'numeric'});
+      const items = Array.isArray(c.items) ? c.items.length : '—';
+      return `
+        <tr style="border-bottom:1px solid var(--border)">
+          <td style="padding:.55rem .8rem;font-family:monospace;font-size:.74rem;color:var(--muted)">${_esc(c.id)}</td>
+          <td style="padding:.55rem .8rem;font-weight:500">${_esc(c.cliente||'—')}</td>
+          <td style="padding:.55rem .8rem;color:var(--muted)">${_esc(c.referencia||'—')}</td>
+          <td style="padding:.55rem .8rem;text-align:center;font-size:.78rem">${items}</td>
+          <td style="padding:.55rem .8rem;text-align:right;color:var(--success);font-family:monospace;font-weight:700">$${Number(c.total_usd||0).toFixed(2)}</td>
+          <td style="padding:.55rem .8rem;color:var(--muted);font-size:.76rem">${fecha}</td>
+          <td style="padding:.55rem .8rem;text-align:center">
+            <button onclick="_sekVerDetalle('${_esc(c.id)}')" style="background:rgba(79,142,247,.12);color:var(--blue);border:none;padding:2px 8px;border-radius:5px;font-size:.73rem;cursor:pointer">Ver</button>
+          </td>
+        </tr>`;
+    }).join('');
+
+    const totalGeneral = cots.reduce((s,c) => s + Number(c.total_usd||0), 0);
+
+    container.innerHTML = `
+      <button class="modal-close" onclick="document.getElementById('adminOverlay').classList.remove('open')">✕</button>
+      <div class="modal-title">📂 Mis Cotizaciones — ${_esc(u.nombre)}</div>
+      <div style="font-size:.78rem;color:var(--muted);margin-bottom:.9rem">${cots.length} cotización(es) · Total acumulado: <strong style="color:var(--success)">$${totalGeneral.toFixed(2)}</strong></div>
+      <div style="overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse;font-size:.82rem;">
+          <thead>
+            <tr style="background:var(--surface2)">
+              <th style="padding:.5rem .8rem;text-align:left;border-bottom:1px solid var(--border);font-size:.65rem;text-transform:uppercase;letter-spacing:.07em;color:var(--muted)">ID</th>
+              <th style="padding:.5rem .8rem;text-align:left;border-bottom:1px solid var(--border);font-size:.65rem;text-transform:uppercase;letter-spacing:.07em;color:var(--muted)">Cliente</th>
+              <th style="padding:.5rem .8rem;text-align:left;border-bottom:1px solid var(--border);font-size:.65rem;text-transform:uppercase;letter-spacing:.07em;color:var(--muted)">Referencia</th>
+              <th style="padding:.5rem .8rem;text-align:center;border-bottom:1px solid var(--border);font-size:.65rem;text-transform:uppercase;letter-spacing:.07em;color:var(--muted)">Líneas</th>
+              <th style="padding:.5rem .8rem;text-align:right;border-bottom:1px solid var(--border);font-size:.65rem;text-transform:uppercase;letter-spacing:.07em;color:var(--muted)">Total</th>
+              <th style="padding:.5rem .8rem;text-align:left;border-bottom:1px solid var(--border);font-size:.65rem;text-transform:uppercase;letter-spacing:.07em;color:var(--muted)">Fecha</th>
+              <th style="padding:.5rem .8rem;border-bottom:1px solid var(--border)"></th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>`;
+
+    /* Guardar referencia de cots para el detalle */
+    window._sekCots = cots;
+  }
+
+  /* ── Ver detalle de una cotización ──────────────────────────── */
+  window._sekVerDetalle = function(id) {
+    const cots = window._sekCots || [];
+    const c = cots.find(x => x.id === id);
+    if (!c) return;
+
+    const items = Array.isArray(c.items) ? c.items : [];
+    const filas = items.map(i => `
+      <tr style="border-bottom:1px solid var(--border)">
+        <td style="padding:.4rem .7rem;font-weight:500;font-size:.8rem">${_esc(i.modelo)}</td>
+        <td style="padding:.4rem .7rem;font-size:.75rem;color:var(--muted)">${_esc(i.marca||'')} · ${_esc(i.cat||'')}</td>
+        <td style="padding:.4rem .7rem;text-align:center">${i.qty}</td>
+        <td style="padding:.4rem .7rem;text-align:right;font-family:monospace;color:var(--blue)">$${Number(i.precio||0).toFixed(2)}</td>
+        <td style="padding:.4rem .7rem;text-align:right;font-family:monospace;font-weight:700;color:var(--success)">$${Number(i.total||0).toFixed(2)}</td>
+      </tr>`).join('');
+
+    const fecha = new Date(c.created_at).toLocaleDateString('es-CR',{day:'2-digit',month:'long',year:'numeric'});
+    const content = document.getElementById('adminContent');
+    content.innerHTML = `
+      <button class="modal-close" onclick="document.getElementById('adminOverlay').classList.remove('open')">✕</button>
+      <div style="display:flex;align-items:center;gap:.7rem;margin-bottom:1rem">
+        <button class="btn btn-ghost btn-sm" onclick="_sekBackHistorial()">← Volver</button>
+        <div>
+          <div class="modal-title" style="margin:0">${_esc(c.id)}</div>
+          <div style="font-size:.73rem;color:var(--muted);margin-top:2px">${fecha} · ${_esc(c.tipo||'')} · Ruta ${_esc(c.ruta||'')}</div>
+        </div>
+      </div>
+      ${c.cliente ? `<div style="margin-bottom:.6rem;font-size:.84rem"><strong>Cliente:</strong> ${_esc(c.cliente)}${c.referencia?' &nbsp;·&nbsp; <strong>Ref:</strong> '+_esc(c.referencia):''}</div>` : ''}
+      ${c.notas ? `<div style="margin-bottom:.6rem;font-size:.8rem;color:var(--muted);background:var(--surface2);padding:.5rem .8rem;border-radius:6px">📝 ${_esc(c.notas)}</div>` : ''}
+      <div style="overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse;font-size:.81rem;">
+          <thead>
+            <tr style="background:var(--surface2)">
+              <th style="padding:.4rem .7rem;text-align:left;border-bottom:1px solid var(--border);font-size:.63rem;text-transform:uppercase;color:var(--muted)">Modelo</th>
+              <th style="padding:.4rem .7rem;text-align:left;border-bottom:1px solid var(--border);font-size:.63rem;text-transform:uppercase;color:var(--muted)">Categoría</th>
+              <th style="padding:.4rem .7rem;text-align:center;border-bottom:1px solid var(--border);font-size:.63rem;text-transform:uppercase;color:var(--muted)">Cant.</th>
+              <th style="padding:.4rem .7rem;text-align:right;border-bottom:1px solid var(--border);font-size:.63rem;text-transform:uppercase;color:var(--muted)">Precio</th>
+              <th style="padding:.4rem .7rem;text-align:right;border-bottom:1px solid var(--border);font-size:.63rem;text-transform:uppercase;color:var(--muted)">Total</th>
+            </tr>
+          </thead>
+          <tbody>${filas || '<tr><td colspan="5" style="padding:1rem;text-align:center;color:var(--muted)">Sin detalle de items</td></tr>'}</tbody>
+        </table>
+      </div>
+      <div style="margin-top:.9rem;padding-top:.75rem;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:1.5rem">
+        <div style="text-align:right">
+          <div style="font-size:.65rem;text-transform:uppercase;color:var(--muted);letter-spacing:.07em">Subtotal</div>
+          <div style="font-family:monospace;font-weight:600">$${(Number(c.total_usd||0)/1.13).toFixed(2)}</div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:.65rem;text-transform:uppercase;color:var(--muted);letter-spacing:.07em">Total con IVA</div>
+          <div style="font-family:monospace;font-weight:800;font-size:1.2rem;color:var(--success)">$${Number(c.total_usd||0).toFixed(2)}</div>
+        </div>
+      </div>`;
+  };
+
+  window._sekBackHistorial = async function() {
+    const u = _getSession();
+    if (!u) return;
+    const overlay = document.getElementById('adminOverlay');
+    const content = document.getElementById('adminContent');
+    content.innerHTML = `
+      <button class="modal-close" onclick="document.getElementById('adminOverlay').classList.remove('open')">✕</button>
+      <div class="modal-title">📂 Mis Cotizaciones — ${_esc(u.nombre)}</div>
+      <div style="padding:2rem;text-align:center;color:var(--muted)">Cargando...</div>`;
+    try {
+      const cots = await _sb(`/cotizaciones_vendedor?vendedor_id=eq.${encodeURIComponent(u.id)}&order=created_at.desc&limit=80`);
+      _renderHistorial(content, cots || [], u);
+    } catch(e) {}
+  };
+
+  /* ── Toast ───────────────────────────────────────────────────── */
+  function _toast(msg, color) {
+    const t = document.getElementById('toast');
+    if (!t) return;
+    t.textContent = msg;
+    t.style.background = color || '#22c55e';
+    t.classList.add('visible');
+    setTimeout(() => t.classList.remove('visible'), 3000);
+  }
+
+  /* ── Escape HTML ─────────────────────────────────────────────── */
+  function _esc(s) {
+    return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  /* ══════════════════════════════════════════════════════════════
+     OVERRIDE hacerLogin() — reemplaza el original con Supabase
+  ══════════════════════════════════════════════════════════════ */
+  window.hacerLogin = async function() {
+    const user = document.getElementById('loginUser').value.trim().toLowerCase();
+    const pass = document.getElementById('loginPass').value;
+    const err  = document.getElementById('loginErr');
+    const btn  = document.getElementById('loginBtn');
+    const spin = document.getElementById('loginSpinner');
+
+    err.textContent = '';
+    if (!user || !pass) { err.textContent = 'Ingresá tu usuario y contraseña.'; return; }
+
+    btn.disabled = true;
+    btn.style.display = 'none';
+    spin.style.display = 'block';
+
+    try {
+      const hash  = await _hash(pass);
+      const users = await _sb(`/usuarios?username=eq.${encodeURIComponent(user)}&pass_hash=eq.${encodeURIComponent(hash)}&select=*`);
+
+      if (!users || users.length === 0) {
+        err.textContent = 'Usuario o contraseña incorrectos.';
+        btn.disabled = false; btn.style.display = 'block'; spin.style.display = 'none';
+        document.getElementById('loginPass').value = '';
+        document.getElementById('loginPass').focus();
+        return;
+      }
+
+      const u = { id: users[0].id, nombre: users[0].nombre, username: users[0].username, role: users[0].role };
+      _setSession(u);
+      /* Actualizar también la variable global que usa el resto de la app */
+      window.usuarioActivo = { usuario: u.username, nombre: u.nombre, clave: '' };
+      _enterApp(u);
+
+    } catch(e) {
+      err.textContent = '⚠ Error de conexión: ' + e.message;
+      btn.disabled = false; btn.style.display = 'block'; spin.style.display = 'none';
+    }
+  };
+
+  /* ══════════════════════════════════════════════════════════════
+     OVERRIDE cerrarSesion()
+  ══════════════════════════════════════════════════════════════ */
+  window.cerrarSesion = function() {
+    if (!confirm('¿Cerrar sesión?')) return;
+    sessionStorage.removeItem(SESSION);
+    _session = null;
+    window.usuarioActivo = null;
+    document.getElementById('loginOverlay').classList.remove('oculto');
+    document.getElementById('sessionBar').style.display = 'none';
+    document.getElementById('loginUser').value = '';
+    document.getElementById('loginPass').value = '';
+    document.getElementById('loginErr').textContent = '';
+    document.getElementById('loginBtn').disabled = false;
+    document.getElementById('loginBtn').style.display = 'block';
+    document.getElementById('loginSpinner').style.display = 'none';
+    /* Quitar botones del header */
+    document.getElementById('btn-sek-save')?.remove();
+    document.getElementById('btn-sek-historial')?.remove();
+    document.getElementById('loginUser').focus();
+  };
+
+  /* ── Restaurar sesión desde sessionStorage al recargar ────────── */
+  const saved = sessionStorage.getItem(SESSION);
+  if (saved) {
+    try {
+      const u = JSON.parse(saved);
+      _session = u;
+      window.usuarioActivo = { usuario: u.username, nombre: u.nombre, clave: '' };
+      document.addEventListener('DOMContentLoaded', () => _enterApp(u));
+      /* Si el DOM ya cargó */
+      if (document.readyState !== 'loading') _enterApp(u);
+    } catch(e) { sessionStorage.removeItem(SESSION); }
+  }
+
+})();
+</script>
 </body></html>
