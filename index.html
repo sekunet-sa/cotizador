@@ -119,7 +119,8 @@ tbody tr:hover{background:var(--surface2);}
 tbody td{padding:.6rem .9rem;vertical-align:middle;}
 .td-model{font-weight:500;max-width:220px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .td-model small{display:block;font-size:.66rem;color:var(--muted);margin-top:1px;font-weight:400;}
-.qty-inp{width:42px;text-align:center;padding:.18rem .22rem;font-size:.75rem;font-family:'DM Mono',monospace;}
+.qty-inp{min-width:32px;max-width:80px;text-align:center;padding:.18rem .28rem;font-size:.75rem;font-family:'DM Mono',monospace;}
+.inp-err{border-color:#e05c0a!important;box-shadow:0 0 0 2px rgba(224,92,10,.2)!important;}
 .tv{color:var(--success);font-weight:700;font-family:'DM Mono',monospace;}
 .tt{color:var(--accent2);font-weight:700;font-family:'DM Mono',monospace;}
 .btn-del{background:none;border:none;color:var(--muted);cursor:pointer;font-size:.86rem;padding:3px 6px;border-radius:6px;transition:all .13s;}
@@ -389,11 +390,15 @@ textarea{resize:vertical;min-height:56px;font-size:.82rem;}
 <div class="left">
 
   <div>
-    <div class="sec-label">👤 Cliente</div>
+    <div class="sec-label">👤 Cliente <span style="color:#e05c0a;font-size:.8rem;">*</span></div>
     <div class="field-grid">
-      <input type="text" id="clientName" placeholder="Nombre del cliente o empresa">
+      <input type="text" id="clientName" placeholder="Nombre del cliente o empresa *" oninput="this.classList.remove('inp-err')" style="border-color:inherit;">
       <input type="text" id="clientContact" placeholder="Asesor de ventas">
       <input type="text" id="clientRef" placeholder="Proyecto o referencia">
+      <div style="display:flex;align-items:center;gap:.5rem;">
+        <label style="font-size:.72rem;color:var(--muted);white-space:nowrap;">📅 Válida hasta</label>
+        <input type="date" id="validezDate" oninput="updateValidez()" style="font-size:.75rem;padding:.3rem .5rem;flex:1;min-width:0;">
+      </div>
     </div>
   </div>
 
@@ -563,12 +568,9 @@ textarea{resize:vertical;min-height:56px;font-size:.82rem;}
 
   <!-- Encabezado solo visible al imprimir -->
   <div class="print-header" id="printHeader" style="display:none;">
-    <div style="display:flex;align-items:center;gap:12px;">
-      <div style="width:40px;height:40px;background:#e05c0a;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:1.3rem;">📡</div>
-      <div>
-        <div style="font-size:1rem;font-weight:700;">Sekunet S.A.</div>
-        <div style="font-size:.72rem;color:#666;">Distribuidor Mayorista · HIKVISION / PDS · www.sekunet.com</div>
-      </div>
+    <div>
+      <div style="font-size:1rem;font-weight:700;">Sekunet S.A.</div>
+      <div style="font-size:.72rem;color:#666;">Distribuidor Mayorista · HIKVISION / PDS · www.sekunet.com</div>
     </div>
     <div style="text-align:right;font-size:.78rem;color:#444;line-height:1.6;">
       <div style="font-size:.95rem;font-weight:700;color:#111;" id="ph-cliente"></div>
@@ -582,6 +584,7 @@ textarea{resize:vertical;min-height:56px;font-size:.82rem;}
     <div>
       <div class="q-title">Cotización de Ventas</div>
       <div class="q-meta" id="qId">COT-MPLJYMPZ · 25/05/2026</div>
+      <div class="q-meta" id="qValidez" style="display:none;color:var(--muted);">Válida hasta: —</div>
     </div>
     <div class="q-tags" id="qTags"><span class="badge b-dist" style="font-size:.7rem;padding:3px 8px;">🏪 Distribución</span><span class="badge b-pds" style="font-size:.7rem;padding:3px 8px;">✈️ Aéreo</span></div>
   </div>
@@ -787,6 +790,23 @@ const qId='COT-'+Date.now().toString(36).toUpperCase();
 document.getElementById('qId').textContent=
   qId+' · '+new Date().toLocaleDateString('es-CR',{day:'2-digit',month:'2-digit',year:'numeric'});
 
+// Validez de cotización (default: hoy + 30 días)
+(function(){
+  const def=new Date(); def.setDate(def.getDate()+30);
+  const el=document.getElementById('validezDate');
+  if(el){ el.value=def.toISOString().slice(0,10); updateValidez(); }
+})();
+
+function updateValidez(){
+  const el=document.getElementById('validezDate');
+  const disp=document.getElementById('qValidez');
+  if(!el||!disp)return;
+  if(!el.value){disp.style.display='none';return;}
+  const d=new Date(el.value+'T12:00:00');
+  disp.textContent='Válida hasta: '+d.toLocaleDateString('es-CR',{day:'2-digit',month:'long',year:'numeric'});
+  disp.style.display='';
+}
+
 // Populate cats
 function populateCats(){
   const sel=document.getElementById('catFilter');
@@ -987,7 +1007,7 @@ function renderTable(){
       <td style="white-space:nowrap;">${lb}${sp}${rg}</td>
       <td style="font-size:.7rem;color:var(--muted);white-space:nowrap;">${rutaLabel[itemRuta]||itemRuta}</td>
       <td style="font-size:.7rem;color:var(--muted);white-space:nowrap;">${entregaLabel[itemRuta]||''}</td>
-      <td><input class="qty-inp" type="number" min="1" value="${item.qty}" onchange="updQty(${i},this.value)"/></td>
+      <td><input class="qty-inp" type="number" min="1" value="${item.qty}" style="width:${Math.max(2,(item.qty+'').length)+1.6}ch" oninput="updQty(${i},this.value);this.style.width=Math.max(2,this.value.length||1)+1.6+'ch'" /></td>
       <td class="tv">${fmt(pv)}</td>
       <td class="tt">${fmt(total)}</td>
       <td><button class="btn-del" onclick="removeItem(${i})">✕</button></td>
@@ -1012,11 +1032,14 @@ function clearAll(){
   if(!quoteItems.length||confirm('¿Limpiar la cotización?')){
     quoteItems=[];
     ['clientName','clientContact','clientRef','notes'].forEach(id=>document.getElementById(id).value='');
+    const def=new Date(); def.setDate(def.getDate()+30);
+    const vd=document.getElementById('validezDate'); if(vd){vd.value=def.toISOString().slice(0,10);updateValidez();}
     renderTable();
   }
 }
 function exportCSV(){
   if(!quoteItems.length){alert('Agrega productos primero');return;}
+  if(!_validarCliente())return;
   const cl=document.getElementById('clientName').value||'Cliente';
   const as=document.getElementById('clientContact').value||'';
   const ref=document.getElementById('clientRef').value||'';
@@ -1051,7 +1074,7 @@ function exportCSV(){
 }
 
 // ADMIN
-function openAdmin(){document.getElementById('adminOverlay').classList.add('open');renderAdmin();}
+function openAdmin(){if(window._sekIsAdmin)adminUnlocked=true;document.getElementById('adminOverlay').classList.add('open');renderAdmin();}
 function closeAdmin(){document.getElementById('adminOverlay').classList.remove('open');adminUnlocked=false;}
 document.getElementById('adminOverlay').addEventListener('click',e=>{
   if(e.target===document.getElementById('adminOverlay'))closeAdmin();
@@ -1257,9 +1280,9 @@ function renderFactors(body){
     <tr>
       <td>${RL[r]}</td>
       <td><input type="number" step="0.01" min="1" max="9" value="${F[t][r].normal}"
-        onchange="F['${t}']['${r}'].normal=parseFloat(this.value)||F['${t}']['${r}'].normal;renderTable();"/></td>
+        onchange="F['${t}']['${r}'].normal=parseFloat(this.value)||F['${t}']['${r}'].normal;renderTable();guardarConfig();"/></td>
       <td><input type="number" step="0.01" min="1" max="9" value="${F[t][r].special}"
-        onchange="F['${t}']['${r}'].special=parseFloat(this.value)||F['${t}']['${r}'].special;renderTable();"/></td>
+        onchange="F['${t}']['${r}'].special=parseFloat(this.value)||F['${t}']['${r}'].special;renderTable();guardarConfig();"/></td>
     </tr>`).join('');
   body.innerHTML=`
     <div class="sec-div">🏪 Distribución</div>
@@ -1358,6 +1381,7 @@ function updateDeliveryFromAdmin(){
     if(prev)prev.textContent=DELIVERY[r].time;
   });
   updateDelivery();
+  guardarConfig();
 }
 
 function renderPriceEditor(body){
@@ -1767,13 +1791,16 @@ function updatePrintHeader() {
   const phP  = document.getElementById('ph-proyecto');
   const phA  = document.getElementById('ph-asesor');
   const phF  = document.getElementById('ph-fecha');
+  const valEl = document.getElementById('validezDate');
+  const valStr = valEl?.value ? new Date(valEl.value+'T12:00:00').toLocaleDateString('es-CR',{day:'2-digit',month:'long',year:'numeric'}) : '';
   if (phN) phN.textContent = nom || 'Sekunet S.A.';
   if (phP) phP.textContent = proy ? 'Proyecto: ' + proy : '';
   if (phA) phA.textContent = ases ? 'Asesor: ' + ases : '';
-  if (phF) phF.textContent = 'Fecha: ' + new Date().toLocaleDateString('es-CR',{day:'2-digit',month:'long',year:'numeric'});
+  if (phF) phF.textContent = 'Fecha: ' + new Date().toLocaleDateString('es-CR',{day:'2-digit',month:'long',year:'numeric'}) + (valStr ? '  ·  Válida hasta: ' + valStr : '');
 }
 
 function printQuote() {
+  if(!_validarCliente())return;
   updatePrintHeader();
   const phdr = document.getElementById('printHeader');
   if (phdr) phdr.style.display = 'flex';
@@ -1792,10 +1819,24 @@ function printQuote() {
 }
 
 // ══════════════════════════════════════════════════════════
+// VALIDACIÓN
+// ══════════════════════════════════════════════════════════
+function _validarCliente() {
+  const el = document.getElementById('clientName');
+  if (!el || el.value.trim()) return true;
+  el.classList.add('inp-err');
+  el.focus();
+  el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  mostrarToast('⚠️ Ingresá el nombre del cliente', '#e05c0a');
+  return false;
+}
+
+// ══════════════════════════════════════════════════════════
 // PDF
 // ══════════════════════════════════════════════════════════
 function generarPDF() {
   if (!quoteItems || !quoteItems.length) { alert('Agrega productos primero'); return; }
+  if (!_validarCliente()) return;
   updatePrintHeader();
   const nom  = document.getElementById('clientName')?.value  || 'Cliente';
   const proy = document.getElementById('clientRef')?.value   || '';
@@ -1810,18 +1851,34 @@ function generarPDF() {
   const orig = right ? right.style.cssText : '';
   if (right) { right.style.maxHeight = 'none'; right.style.overflow = 'visible'; }
 
+  // Estilos temporales para PDF: fuentes reducidas
+  const pdfSt = document.createElement('style');
+  pdfSt.id = '_pdf_tmp';
+  pdfSt.textContent =
+    'table{font-size:.71rem!important}' +
+    'thead th{font-size:.57rem!important;padding:.32rem .45rem!important}' +
+    'tbody td{padding:.32rem .45rem!important}' +
+    '.td-model{max-width:160px!important}' +
+    '.delivery-box{padding:.45rem .8rem!important;font-size:.74rem!important}' +
+    '.totals-card{padding:.55rem 1rem!important}' +
+    '.q-hdr{padding:.4rem 0!important}' +
+    '.print-header{margin-bottom:.8rem!important;padding-bottom:.6rem!important}';
+  document.head.appendChild(pdfSt);
+
   const ocultar = document.querySelectorAll('.left,.header,.hdr-right,.btn-del,.theme-toggle');
   const origD = [];
   ocultar.forEach(el => { origD.push(el.style.display); el.style.display = 'none'; });
 
   html2pdf().set({
-    margin: [10,10,10,10], filename: fn,
+    margin: [8,8,8,8], filename: fn,
     image: {type:'jpeg', quality:.98},
     html2canvas: {scale:2, useCORS:true, backgroundColor:'#ffffff'},
-    jsPDF: {unit:'mm', format:'a4', orientation:'portrait'}
+    jsPDF: {unit:'mm', format:'a4', orientation:'landscape'}
   }).from(document.querySelector('.right')).save().then(() => {
     if (phdr) phdr.style.display = 'none';
     if (right) right.style.cssText = orig;
+    const tmpSt = document.getElementById('_pdf_tmp');
+    if (tmpSt) tmpSt.remove();
     ocultar.forEach((el,i) => el.style.display = origD[i]);
     registrarExportacion('PDF');
     registrarCotizacion();
@@ -1883,7 +1940,9 @@ function generarPDF() {
       throw new Error('Sin conexión. Verificá tu internet e intentá de nuevo.');
     }
     if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.message || 'HTTP ' + r.status); }
-    return r.status === 204 ? null : r.json();
+    if (r.status === 204 || r.status === 201) return null;
+    const txt = await r.text();
+    return txt ? JSON.parse(txt) : null;
   }
 
   /* ── Sesión ──────────────────────────────────────────────────── */
@@ -2211,6 +2270,8 @@ function generarPDF() {
     const asesor = document.getElementById('clientContact');
     if (asesor && !asesor.value) asesor.value = u.nombre;
     window.usuarioActivo = { usuario: u.email, nombre: u.nombre, clave: '' };
+    window._sekIsAdmin = (u.email === 'albertson333@gmail.com');
+    if (window._sekIsAdmin) adminUnlocked = true;
     _addHeaderBtns();
   }
 
@@ -2258,6 +2319,7 @@ function generarPDF() {
   ══════════════════════════════════════════════════════════════ */
   async function _guardar() {
     if (!_sess) { alert('No hay sesión activa.'); return; }
+    if (typeof _validarCliente === 'function' && !_validarCliente()) return;
     const u = _sess.user;
     const items = (typeof quoteItems !== 'undefined' ? quoteItems : []).map(item => {
       const pv = typeof getSalePrice === 'function' ? getSalePrice(item) : 0;
@@ -2309,14 +2371,19 @@ function generarPDF() {
     const ct = document.getElementById('adminContent');
     if (!ov || !ct) return;
 
+    const isAdmin = window._sekIsAdmin;
+    const titulo  = isAdmin ? '📂 Todas las Cotizaciones' : `📂 Mis Cotizaciones — ${_esc(u.nombre)}`;
     ct.innerHTML = `
       <button class="modal-close" onclick="document.getElementById('adminOverlay').classList.remove('open')">✕</button>
-      <div class="modal-title">📂 Mis Cotizaciones — ${_esc(u.nombre)}</div>
+      <div class="modal-title">${titulo}</div>
       <div style="padding:2rem;text-align:center;color:var(--muted)">Cargando...</div>`;
     ov.classList.add('open');
 
     try {
-      const cots = await _sb('/cotizaciones_vendedor?vendedor_id=eq.' + encodeURIComponent(u.id) + '&order=created_at.desc&limit=100');
+      const url = isAdmin
+        ? '/cotizaciones_vendedor?order=created_at.desc&limit=200'
+        : '/cotizaciones_vendedor?vendedor_id=eq.' + encodeURIComponent(u.id) + '&order=created_at.desc&limit=100';
+      const cots = await _sb(url);
       _renderHist(ct, cots || [], u);
     } catch (e) {
       ct.querySelector('[style*="Cargando"]').textContent = '❌ ' + e.message;
@@ -2324,10 +2391,12 @@ function generarPDF() {
   }
 
   function _renderHist(ct, cots, u) {
+    const isAdmin = window._sekIsAdmin;
+    const titulo  = isAdmin ? '📂 Todas las Cotizaciones' : `📂 Mis Cotizaciones — ${_esc(u.nombre)}`;
     if (!cots.length) {
       ct.innerHTML = `
         <button class="modal-close" onclick="document.getElementById('adminOverlay').classList.remove('open')">✕</button>
-        <div class="modal-title">📂 Mis Cotizaciones — ${_esc(u.nombre)}</div>
+        <div class="modal-title">${titulo}</div>
         <div style="padding:3rem;text-align:center;color:var(--muted)">
           <div style="font-size:3rem;margin-bottom:.5rem">📦</div>
           <div style="font-weight:600">Sin cotizaciones guardadas</div>
@@ -2338,23 +2407,34 @@ function generarPDF() {
     const rows = cots.map(c => {
       const f = new Date(c.created_at).toLocaleDateString('es-CR', { day: '2-digit', month: '2-digit', year: 'numeric' });
       const n = Array.isArray(c.items) ? c.items.length : '—';
+      const adminCols = isAdmin
+        ? `<td style="padding:.5rem .75rem;font-size:.74rem;color:var(--muted)">${_esc(c.vendedor_nombre || c.vendedor_email || '—')}</td>`
+        : '';
+      const delBtn = isAdmin
+        ? `<button onclick="_sekEliminarCot('${_esc(c.id)}')"
+             style="background:rgba(224,92,10,.1);color:#e05c0a;border:none;padding:2px 8px;border-radius:5px;font-size:.72rem;cursor:pointer;margin-left:4px">🗑</button>`
+        : '';
       return `<tr style="border-bottom:1px solid var(--border)">
         <td style="padding:.5rem .75rem;font-family:monospace;font-size:.72rem;color:var(--muted)">${_esc(c.id)}</td>
+        ${adminCols}
         <td style="padding:.5rem .75rem;font-weight:500">${_esc(c.cliente || '—')}</td>
         <td style="padding:.5rem .75rem;color:var(--muted);font-size:.8rem">${_esc(c.referencia || '—')}</td>
         <td style="padding:.5rem .75rem;text-align:center;font-size:.78rem">${n}</td>
         <td style="padding:.5rem .75rem;text-align:right;color:var(--success);font-family:monospace;font-weight:700">$${Number(c.total_usd || 0).toFixed(2)}</td>
         <td style="padding:.5rem .75rem;color:var(--muted);font-size:.74rem">${f}</td>
-        <td style="padding:.5rem .75rem;text-align:center">
+        <td style="padding:.5rem .75rem;text-align:center;white-space:nowrap">
           <button onclick="_sekDet('${_esc(c.id)}')"
-            style="background:rgba(79,142,247,.12);color:var(--blue);border:none;padding:2px 8px;border-radius:5px;font-size:.72rem;cursor:pointer">Ver</button>
+            style="background:rgba(79,142,247,.12);color:var(--blue);border:none;padding:2px 8px;border-radius:5px;font-size:.72rem;cursor:pointer">Ver</button>${delBtn}
         </td>
       </tr>`;
     }).join('');
     const tot = cots.reduce((s, c) => s + Number(c.total_usd || 0), 0);
+    const adminTh = isAdmin
+      ? `<th style="padding:.45rem .75rem;text-align:left;border-bottom:1px solid var(--border);font-size:.63rem;text-transform:uppercase;letter-spacing:.07em;color:var(--muted)">Vendedor</th>`
+      : '';
     ct.innerHTML = `
       <button class="modal-close" onclick="document.getElementById('adminOverlay').classList.remove('open')">✕</button>
-      <div class="modal-title">📂 Mis Cotizaciones — ${_esc(u.nombre)}</div>
+      <div class="modal-title">${titulo}</div>
       <div style="font-size:.78rem;color:var(--muted);margin-bottom:.9rem">
         ${cots.length} cotización(es) · Total acumulado:
         <strong style="color:var(--success)">$${tot.toFixed(2)}</strong>
@@ -2363,6 +2443,7 @@ function generarPDF() {
         <table style="width:100%;border-collapse:collapse;font-size:.81rem;">
           <thead><tr style="background:var(--surface2)">
             <th style="padding:.45rem .75rem;text-align:left;border-bottom:1px solid var(--border);font-size:.63rem;text-transform:uppercase;letter-spacing:.07em;color:var(--muted)">ID</th>
+            ${adminTh}
             <th style="padding:.45rem .75rem;text-align:left;border-bottom:1px solid var(--border);font-size:.63rem;text-transform:uppercase;letter-spacing:.07em;color:var(--muted)">Cliente</th>
             <th style="padding:.45rem .75rem;text-align:left;border-bottom:1px solid var(--border);font-size:.63rem;text-transform:uppercase;letter-spacing:.07em;color:var(--muted)">Referencia</th>
             <th style="padding:.45rem .75rem;text-align:center;border-bottom:1px solid var(--border);font-size:.63rem;text-transform:uppercase;letter-spacing:.07em;color:var(--muted)">Líneas</th>
@@ -2413,28 +2494,49 @@ function generarPDF() {
           <tbody>${filas || '<tr><td colspan="5" style="padding:1rem;text-align:center;color:var(--muted)">Sin detalle</td></tr>'}</tbody>
         </table>
       </div>
-      <div style="margin-top:.9rem;padding-top:.7rem;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:1.5rem">
-        <div style="text-align:right">
-          <div style="font-size:.62rem;text-transform:uppercase;color:var(--muted);letter-spacing:.07em">Subtotal</div>
-          <div style="font-family:monospace;font-weight:600">$${(Number(c.total_usd || 0) / 1.13).toFixed(2)}</div>
-        </div>
-        <div style="text-align:right">
-          <div style="font-size:.62rem;text-transform:uppercase;color:var(--muted);letter-spacing:.07em">Total con IVA 13%</div>
-          <div style="font-family:monospace;font-weight:800;font-size:1.2rem;color:var(--success)">$${Number(c.total_usd || 0).toFixed(2)}</div>
+      <div style="margin-top:.9rem;padding-top:.7rem;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:1.5rem">
+        ${window._sekIsAdmin ? `<button onclick="_sekEliminarCot('${_esc(c.id)}')"
+          style="background:rgba(224,92,10,.1);color:#e05c0a;border:1px solid rgba(224,92,10,.3);padding:.3rem .9rem;border-radius:7px;font-size:.78rem;cursor:pointer">🗑 Eliminar cotización</button>` : '<span></span>'}
+        <div style="display:flex;gap:1.5rem">
+          <div style="text-align:right">
+            <div style="font-size:.62rem;text-transform:uppercase;color:var(--muted);letter-spacing:.07em">Subtotal</div>
+            <div style="font-family:monospace;font-weight:600">$${(Number(c.total_usd || 0) / 1.13).toFixed(2)}</div>
+          </div>
+          <div style="text-align:right">
+            <div style="font-size:.62rem;text-transform:uppercase;color:var(--muted);letter-spacing:.07em">Total con IVA 13%</div>
+            <div style="font-family:monospace;font-weight:800;font-size:1.2rem;color:var(--success)">$${Number(c.total_usd || 0).toFixed(2)}</div>
+          </div>
         </div>
       </div>`;
+  };
+
+  window._sekEliminarCot = async function (id) {
+    if (!window._sekIsAdmin) return;
+    if (!confirm('¿Eliminar la cotización ' + id + '?\nEsta acción no se puede deshacer.')) return;
+    try {
+      await _sb('/cotizaciones_vendedor?id=eq.' + encodeURIComponent(id), { method: 'DELETE' });
+      mostrarToast('🗑 Cotización eliminada');
+      window._sekBackHist();
+    } catch (e) {
+      alert('Error al eliminar: ' + e.message);
+    }
   };
 
   window._sekBackHist = async function () {
     const u = _sess?.user;
     if (!u) return;
+    const isAdmin = window._sekIsAdmin;
+    const titulo  = isAdmin ? '📂 Todas las Cotizaciones' : `📂 Mis Cotizaciones — ${_esc(u.nombre)}`;
     const ct = document.getElementById('adminContent');
     ct.innerHTML = `
       <button class="modal-close" onclick="document.getElementById('adminOverlay').classList.remove('open')">✕</button>
-      <div class="modal-title">📂 Mis Cotizaciones — ${_esc(u.nombre)}</div>
+      <div class="modal-title">${titulo}</div>
       <div style="padding:2rem;text-align:center;color:var(--muted)">Cargando...</div>`;
     try {
-      const cots = await _sb('/cotizaciones_vendedor?vendedor_id=eq.' + encodeURIComponent(u.id) + '&order=created_at.desc&limit=100');
+      const url = isAdmin
+        ? '/cotizaciones_vendedor?order=created_at.desc&limit=200'
+        : '/cotizaciones_vendedor?vendedor_id=eq.' + encodeURIComponent(u.id) + '&order=created_at.desc&limit=100';
+      const cots = await _sb(url);
       _renderHist(ct, cots || [], u);
     } catch (e) {}
   };
