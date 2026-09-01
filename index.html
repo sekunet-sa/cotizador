@@ -808,7 +808,7 @@ let F = {
   }
 };
 
- });
+
 
 function getMargin(item){
   const bc=MARGINS.byCat[item.cat];
@@ -1560,6 +1560,57 @@ const REGISTRO_URL = 'https://script.google.com/macros/s/AKfycbwpFwNE8H3P6cB3zqx
 let usuarioActivo = null;
 let horaIngreso = null;
 
+
+// ══════════════════════════════════════════════════════════
+// GOOGLE SHEETS — Registro de actividad
+// ══════════════════════════════════════════════════════════
+
+async function enviarRegistro(datos) {
+  try {
+    await fetch(REGISTRO_URL, {
+      method: 'POST', mode: 'no-cors',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(datos)
+    });
+  } catch(e) { console.warn('Registro omitido:', e.message); }
+}
+
+async function registrarAcceso(nombre, fecha) {
+  await enviarRegistro({
+    tipo: 'acceso', asesor: nombre,
+    fecha: fecha.toLocaleDateString('es-CR', {day:'2-digit',month:'2-digit',year:'numeric'}),
+    hora:  fecha.toLocaleTimeString('es-CR', {hour:'2-digit',minute:'2-digit',second:'2-digit'}),
+    fechaHora: fecha.toISOString()
+  });
+}
+
+function registrarCotizacion() {
+  if (!usuarioActivo) return;
+  const sub = quoteItems.reduce((s,i) => s + getSalePrice(i)*i.qty, 0);
+  enviarRegistro({
+    tipo: 'cotizacion', asesor: usuarioActivo.nombre,
+    cliente:  document.getElementById('clientName')?.value  || '',
+    proyecto: document.getElementById('clientRef')?.value   || '',
+    ruta:  ({aereo:'Aéreo',maritimo:'Marítimo',terrestre:'Terrestre'})[route]  || route,
+    lista: ({distribucion:'Distribución',proyecto:'Proyecto'})[tipo] || tipo,
+    subtotal: sub.toFixed(2),
+    iva:      (sub*0.13).toFixed(2),
+    total:    (sub*1.13).toFixed(2),
+    fecha: new Date().toLocaleDateString('es-CR', {day:'2-digit',month:'2-digit',year:'numeric'})
+  });
+}
+
+function registrarExportacion(tipoExport) {
+  if (!usuarioActivo) return;
+  const sub = quoteItems.reduce((s,i) => s + getSalePrice(i)*i.qty, 0);
+  enviarRegistro({
+    tipo: 'exportacion', asesor: usuarioActivo.nombre, tipoExport,
+    cliente: document.getElementById('clientName')?.value || '',
+    total:   (sub*1.13).toFixed(2),
+    fecha: new Date().toLocaleDateString('es-CR', {day:'2-digit',month:'2-digit',year:'numeric'})
+  });
+}
+
 // ══════════════════════════════════════════════════════════
 // SUPABASE AUTH
 // ══════════════════════════════════════════════════════════
@@ -1774,8 +1825,8 @@ function mostrarToast(msg, color) {
 // CONFIG — LOCAL STORAGE + NUBE (Supabase)
 // ══════════════════════════════════════════════════════════
 const LS_KEY       = 'sekunet_config_v1';
-    });
-  }
+
+
   if (cfg.margenes) {
     if (cfg.margenes.global != null) MARGINS.global = cfg.margenes.global;
     if (cfg.margenes.byList)         MARGINS.byList = cfg.margenes.byList;
@@ -1808,18 +1859,40 @@ function guardarConfig() {
     tiempos: DELIVERY
   };
   try { localStorage.setItem(LS_KEY, JSON.stringify(cfg)); } catch(e) { console.warn('localStorage error:', e.message); }
-  _guardarConfigNube(cfg); // async, sin bloquear
 }
 
 function cargarConfig() {
-  // 1) Carga local inmediata (síncrona, sin latencia)
   try {
     const raw = localStorage.getItem(LS_KEY);
+    if (!raw) return;
+    const cfg = JSON.parse(raw);
+    if (cfg.factores) {
+      ['distribucion','proyecto'].forEach(l => {
+        if (cfg.factores[l]) ['aereo','maritimo','terrestre'].forEach(r => {
+          if (cfg.factores[l][r]) F[l][r] = cfg.factores[l][r];
+        });
+      });
+    }
+    if (cfg.margenes) {
+      if (cfg.margenes.global != null) MARGINS.global = cfg.margenes.global;
+      if (cfg.margenes.byList) MARGINS.byList = cfg.margenes.byList;
+      if (cfg.margenes.byCat) Object.assign(MARGINS.byCat, cfg.margenes.byCat);
+    }
+    if (cfg.usuarios && cfg.usuarios.length > 0) {
+      USUARIOS.length = 0;
+      cfg.usuarios.forEach(u => USUARIOS.push(u));
+    }
+    if (cfg.tiempos) {
+      ['aereo','maritimo','terrestre'].forEach(r => {
+        if (cfg.tiempos[r]) Object.assign(DELIVERY[r], cfg.tiempos[r]);
+      });
+    }
+  } catch(e) { console.warn('cargarConfig:', e.message); }
+}
 
 function borrarConfig() {
   if (!confirm('¿Restablecer TODA la configuración a los valores por defecto?\nSe borrarán factores, márgenes, usuarios y tiempos guardados.')) return;
   localStorage.removeItem(LS_KEY);
-  _guardarConfigNube({}); // limpiar nube también
   mostrarToast('🔄 Configuración restablecida', '#e05c0a');
   setTimeout(() => location.reload(), 1000);
 }
