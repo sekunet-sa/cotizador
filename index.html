@@ -2535,30 +2535,37 @@ document.addEventListener('keydown', e=>{
 </script>
 
 
+<
+
 <script>
-// ══ MÓDULO PEDIDOS ════════════════════════════════════════
-const ESTADOS = ['Pendiente','Recibido','En proceso','En tránsito','Entregado','Facturado'];
-const ESTADO_CSS = {
+// ══════════════════════════════════════════════════════════
+// MÓDULO PEDIDOS — v1.6.0
+// ══════════════════════════════════════════════════════════
+var ESTADOS = ['Pendiente','Recibido','En proceso','En tránsito','Entregado','Facturado'];
+var ESTADO_CSS = {
   'Pendiente':'est-pendiente','Recibido':'est-recibido',
   'En proceso':'est-proceso','En tránsito':'est-transito',
   'Entregado':'est-entregado','Facturado':'est-facturado'
 };
-const ESTADO_ICO = {
+var ESTADO_ICO = {
   'Pendiente':'🟡','Recibido':'🔵','En proceso':'⚙️',
   'En tránsito':'🚚','Entregado':'📦','Facturado':'✅'
 };
 
-let _pedidos = [];
-let _pedFiltro = '';
-let _esAdmin = false;
+var _pedidos = [];
+var _pedFiltro = '';
+var _esAdmin = false;
+var SB_URL_P = 'https://loldcmqaklfpmvnxkxbu.supabase.co';
+var SB_KEY_P = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxvbGRjbXFha2xmcG12bnhreGJ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU2MTgyMTksImV4cCI6MjEwMTE5NDIxOX0.RI6FcpDz_Z4WBPvmsT0Jx76OVCzqXFZ6sR0LoKUokKo';
 
 function setModulo(mod) {
-  // Toggle modules
-  document.getElementById('modCotizador').style.display = mod==='cotizador' ? '' : 'none';
-  document.getElementById('modPedidos').style.display   = mod==='pedidos'   ? '' : 'none';
-  // Update tab styles
-  ['cotizador','pedidos'].forEach(m => {
-    const btn = document.getElementById('modTab-'+m);
+  var cot = document.getElementById('modCotizador');
+  var ped = document.getElementById('modPedidos');
+  if(cot) cot.style.display = mod==='cotizador' ? '' : 'none';
+  if(ped) ped.style.display = mod==='pedidos' ? '' : 'none';
+  var tabs = ['cotizador','pedidos'];
+  tabs.forEach(function(m) {
+    var btn = document.getElementById('modTab-'+m);
     if(!btn) return;
     btn.style.background = m===mod ? 'var(--surface)' : 'none';
     btn.style.color = m===mod ? 'var(--text)' : 'var(--muted)';
@@ -2567,199 +2574,200 @@ function setModulo(mod) {
   if(mod==='pedidos') cargarPedidos();
 }
 
+function _sbHeaders() {
+  return {
+    'Content-Type': 'application/json',
+    'apikey': SB_KEY_P,
+    'Authorization': 'Bearer ' + (typeof _sbSession !== 'undefined' && _sbSession ? _sbSession.access_token : SB_KEY_P)
+  };
+}
+
 async function cargarPedidos() {
-  if(!_sbSession && !usuarioActivo) return;
-  const lista = document.getElementById('ped-lista');
+  if(!usuarioActivo) return;
+  var lista = document.getElementById('ped-lista');
+  if(!lista) return;
   lista.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--muted);">⏳ Cargando...</div>';
 
-  // Check if admin
-  const ADMINS = ['aescobar@sekunet.com','admin@sekunet.com'];
-  _esAdmin = ADMINS.includes(usuarioActivo?.email?.toLowerCase()) ||
-             usuarioActivo?.nombre?.toLowerCase() === 'administrador' ||
-             usuarioActivo?.nombre?.toLowerCase() === 'admin';
+  var ADMINS = ['aescobar@sekunet.com','admin@sekunet.com'];
+  _esAdmin = ADMINS.indexOf((usuarioActivo.email||'').toLowerCase()) >= 0
+    || (usuarioActivo.nombre||'').toLowerCase() === 'administrador'
+    || (usuarioActivo.nombre||'').toLowerCase() === 'admin';
 
-  document.getElementById('ped-subtitle').textContent = _esAdmin
-    ? 'Todas las solicitudes — Vista Administrador'
-    : 'Mis solicitudes — ' + (usuarioActivo?.nombre||'');
+  var sub = document.getElementById('ped-subtitle');
+  if(sub) sub.textContent = _esAdmin ? 'Todas las solicitudes — Vista Administrador' : 'Mis solicitudes — '+(usuarioActivo.nombre||'');
 
   try {
-    // Build query - admin sees all, asesor sees only their own
-    let url = 'https://loldcmqaklfpmvnxkxbu.supabase.co/rest/v1/solicitudes_pedido?select=*&order=created_at.desc';
-    if(!_esAdmin) url += '&asesor=eq.' + encodeURIComponent(usuarioActivo?.nombre||'');
-
-    const res = await fetch(url, {
-      headers: {
-        'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxvbGRjbXFha2xmcG12bnhreGJ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU2MTgyMTksImV4cCI6MjEwMTE5NDIxOX0.RI6FcpDz_Z4WBPvmsT0Jx76OVCzqXFZ6sR0LoKUokKo',
-        'Authorization': 'Bearer ' + (_sbSession?.access_token||'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxvbGRjbXFha2xmcG12bnhreGJ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU2MTgyMTksImV4cCI6MjEwMTE5NDIxOX0.RI6FcpDz_Z4WBPvmsT0Jx76OVCzqXFZ6sR0LoKUokKo')
-      }
-    });
+    var url = SB_URL_P + '/rest/v1/solicitudes_pedido?select=*&order=created_at.desc';
+    if(!_esAdmin) url += '&asesor=eq.' + encodeURIComponent(usuarioActivo.nombre||'');
+    var res = await fetch(url, { headers: _sbHeaders() });
     _pedidos = await res.json();
     renderPedidos();
   } catch(e) {
-    lista.innerHTML = '<div style="text-align:center;padding:2rem;color:#f87171;">Error al cargar pedidos: ' + e.message + '</div>';
+    lista.innerHTML = '<div style="text-align:center;padding:2rem;color:#f87171;">Error: ' + e.message + '</div>';
   }
 }
 
 function filtrarPedidos(estado) {
   _pedFiltro = estado;
-  document.querySelectorAll('.ped-filtro').forEach(b => {
-    b.classList.toggle('on', b.textContent.includes(estado) || (estado==='' && b.textContent==='Todos'));
+  document.querySelectorAll('.ped-filtro').forEach(function(b) {
+    b.classList.toggle('on', b.textContent.indexOf(estado) >= 0 || (estado==='' && b.textContent==='Todos'));
   });
   renderPedidos();
 }
 
 function renderPedidos() {
-  const lista = document.getElementById('ped-lista');
-  const filtrados = _pedFiltro ? _pedidos.filter(p=>p.estado===_pedFiltro) : _pedidos;
+  var lista = document.getElementById('ped-lista');
+  if(!lista) return;
+  var filtrados = _pedFiltro ? _pedidos.filter(function(p){ return p.estado===_pedFiltro; }) : _pedidos;
 
   if(!filtrados.length) {
-    lista.innerHTML = '<div style="text-align:center;padding:3rem;color:var(--muted);"><div style="font-size:2rem;margin-bottom:.5rem;">📭</div><div>No hay solicitudes ' + (_pedFiltro?'con estado '+_pedFiltro:'') + '</div></div>';
+    lista.innerHTML = '<div style="text-align:center;padding:3rem;color:var(--muted);"><div style="font-size:2rem;margin-bottom:.5rem;">📭</div><div>No hay solicitudes'
+      + (_pedFiltro ? ' con estado '+_pedFiltro : '') + '</div></div>';
     return;
   }
 
-  lista.innerHTML = filtrados.map(p => {
-    const estadoCss = ESTADO_CSS[p.estado]||'est-pendiente';
-    const fecha = p.created_at ? new Date(p.created_at).toLocaleDateString('es-CR',{day:'2-digit',month:'2-digit',year:'numeric'}) : '';
-    const hora  = p.created_at ? new Date(p.created_at).toLocaleTimeString('es-CR',{hour:'2-digit',minute:'2-digit'}) : '';
-
-    // Progress bar
-    const stepIdx = ESTADOS.indexOf(p.estado);
-    const progHtml = ESTADOS.map((e,i) => {
-      const done = i <= stepIdx;
-      const isNext = _esAdmin && i === stepIdx+1;
-      return `<div class="ped-step ${done?'done':''} ${isNext?'admin-btn':''}"
-        ${isNext ? `onclick="avanzarEstado(${p.id},'${e}')" title="Marcar como ${e}"` : ''}
-        >${ESTADO_ICO[e]} ${e}</div>`;
-    }).join('');
-
-    // Productos
-    const prods = (p.productos||'').split('\n').filter(Boolean);
-    const prodsHtml = prods.map(pr =>
-      `<div style="font-size:.76rem;padding:.2rem 0;border-bottom:1px solid var(--border);font-family:'DM Mono',monospace;">${pr}</div>`
-    ).join('');
-
-    // Checklist para asesor (solo estados finales)
-    const chkAsesor = !_esAdmin && p.estado==='Entregado'
-      ? `<div style="margin-top:.7rem;padding:.65rem;background:var(--surface2);border-radius:8px;border:1px solid var(--border);">
-          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:.8rem;font-weight:600;">
-            <input type="checkbox" onchange="confirmarEntrega(${p.id},this.checked)" ${p.asesor_confirmo?'checked disabled':''}/> 
-            ${p.asesor_confirmo ? '✅ Confirmé la entrega al cliente' : 'Confirmar que se entregó al cliente'}
-          </label>
-        </div>` : '';
-
-    const chkFactura = !_esAdmin && p.estado==='Entregado' && p.asesor_confirmo
-      ? '<div style="margin-top:.4rem;padding:.65rem;background:var(--surface2);border-radius:8px;border:1px solid var(--border);">'
-        + '<div style="font-size:.78rem;font-weight:600;margin-bottom:.45rem;">🧾 Confirmar facturación</div>'
-        + (!p.asesor_facturo
-          ? '<div style="display:flex;gap:6px;margin-bottom:.4rem;">'
-            + '<input type="text" id="fac-'+p.id+'" placeholder="Número de factura Sekunet" value="'+(p.num_factura||'')+'"'
-            + ' style="flex:1;padding:.38rem .6rem;border-radius:7px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-family:inherit;font-size:.8rem;"/>'
-            + '</div>'
-            + '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:.78rem;">'
-            + '<input type="checkbox" onchange="confirmarFactura('+p.id+',this.checked)"/>'
-            + ' Confirmar que fue facturado por Sekunet</label>'
-          : '<div style="display:flex;align-items:center;gap:8px;">'
-            + '<span style="color:#16a34a;font-size:.9rem;">✅</span>'
-            + '<span style="font-size:.78rem;">Facturado confirmado</span>'
-            + (p.num_factura ? '<span style="background:rgba(34,197,94,.15);color:#16a34a;padding:.18rem .55rem;border-radius:6px;font-size:.76rem;font-weight:700;">🧾 '+p.num_factura+'</span>' : '')
-            + '</div>')
-        + '</div>';
-    }
-
-    // Admin actions
-    var adminHtml = '';
-    if(_esAdmin) {
-      var estadoBtns = ESTADOS.filter(function(e){ return e!==p.estado; }).map(function(e){
-        return '<button onclick="cambiarEstado('+p.id+',\''+e+'\')"'
-          +' style="background:var(--surface2);border:1px solid var(--border);color:var(--muted);padding:.2rem .55rem;border-radius:6px;cursor:pointer;font-family:inherit;font-size:.7rem;transition:all .15s;"'
-          +' onmouseover="this.style.borderColor=\'var(--accent)\'" onmouseout="this.style.borderColor=\'var(--border)\'"'
-          +'>'+ESTADO_ICO[e]+' '+e+'</button>';
-      }).join('');
-
-      adminHtml = '<div style="margin-top:.75rem;">'
-        + '<div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;margin-bottom:.6rem;">'
-        + '<span style="font-size:.72rem;color:var(--muted);font-weight:600;">Mover estado:</span>'
-        + estadoBtns
-        + '</div>'
-        + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;padding:.7rem;background:var(--surface2);border-radius:8px;border:1px solid var(--border);">'
-        + '<div>'
-        + '<div style="font-size:.65rem;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.07em;margin-bottom:.25rem;">📋 # Solicitud Sekunet</div>'
-        + '<div style="display:flex;gap:5px;">'
-        + '<input type="text" id="num-sol-'+p.id+'" value="'+(p.num_solicitud||'')+'" placeholder="Ej: SEK-2026-001"'
-        + ' style="flex:1;padding:.32rem .55rem;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-family:inherit;font-size:.78rem;font-weight:600;"/>'
-        + '<button onclick="guardarRefs('+p.id+')" style="background:var(--accent);color:#fff;border:none;padding:.32rem .6rem;border-radius:6px;cursor:pointer;font-size:.72rem;font-weight:600;">✓</button>'
-        + '</div></div>'
-        + '<div>'
-        + '<div style="font-size:.65rem;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.07em;margin-bottom:.25rem;">🏷️ PI Hikvision</div>'
-        + '<div style="display:flex;gap:5px;">'
-        + '<input type="text" id="pi-hik-'+p.id+'" value="'+(p.pi_hikvision||'')+'" placeholder="Ej: PI-2026-12345"'
-        + ' style="flex:1;padding:.32rem .55rem;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-family:inherit;font-size:.78rem;font-weight:600;"/>'
-        + '<button onclick="guardarRefs('+p.id+')" style="background:var(--accent);color:#fff;border:none;padding:.32rem .6rem;border-radius:6px;cursor:pointer;font-size:.72rem;font-weight:600;">✓</button>'
-        + '</div></div>'
-        + '</div></div>';
-    }
-
-    return `<div class="ped-card">
-      <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:.5rem;margin-bottom:.6rem;">
-        <div>
-          <div style="font-size:.92rem;font-weight:700;">${p.cliente} <span style="color:var(--muted);font-weight:400;font-size:.8rem;">— ${p.proyecto||'Sin proyecto'}</span></div>
-          <div style="font-size:.72rem;color:var(--muted);margin-top:2px;">
-            👤 ${p.asesor} &nbsp;·&nbsp; 📅 ${fecha} ${hora}
-            ${_esAdmin && p.asesor_confirmo ? ' &nbsp;·&nbsp; ✅ Entrega confirmada por asesor':''}
-            ${_esAdmin && p.asesor_facturo  ? ' &nbsp;·&nbsp; ✅ Factura confirmada por asesor':''}
-          </div>
-        </div>
-        <span class="ped-estado ${estadoCss}">${ESTADO_ICO[p.estado]||''} ${p.estado}</span>
-      </div>
-      <div class="ped-prog">${progHtml}</div>
-      <div style="margin:.5rem 0;max-height:120px;overflow-y:auto;">${prodsHtml}</div>
-      ${refsHtml}
-      ${docsHtml}
-      ${p.notas?`<div style="font-size:.75rem;color:var(--muted);margin-top:.4rem;font-style:italic;">📝 ${p.notas}</div>`:''}
-      ${adminHtml}
-      ${chkAsesor}
-      ${chkFactura}
-    </div>`;
-  }).join('');
+  lista.innerHTML = '';
+  filtrados.forEach(function(p) {
+    lista.appendChild(crearTarjetaPedido(p));
+  });
 }
 
-async function guardarRefs(id) {
-  const numSol = document.getElementById('num-sol-'+id)?.value.trim()||'';
-  const piHik  = document.getElementById('pi-hik-'+id)?.value.trim()||'';
-  try {
-    await fetch('https://loldcmqaklfpmvnxkxbu.supabase.co/rest/v1/solicitudes_pedido?id=eq.'+id, {
-      method:'PATCH', mode:'cors',
-      headers:{
-        'Content-Type':'application/json',
-        'apikey':'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxvbGRjbXFha2xmcG12bnhreGJ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU2MTgyMTksImV4cCI6MjEwMTE5NDIxOX0.RI6FcpDz_Z4WBPvmsT0Jx76OVCzqXFZ6sR0LoKUokKo',
-        'Authorization':'Bearer '+(_sbSession?.access_token||'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxvbGRjbXFha2xmcG12bnhreGJ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU2MTgyMTksImV4cCI6MjEwMTE5NDIxOX0.RI6FcpDz_Z4WBPvmsT0Jx76OVCzqXFZ6sR0LoKUokKo'),
-        'Prefer':'return=minimal'
-      },
-      body: JSON.stringify({num_solicitud: numSol, pi_hikvision: piHik})
+function crearTarjetaPedido(p) {
+  var card = document.createElement('div');
+  card.className = 'ped-card';
+
+  var estadoCss = ESTADO_CSS[p.estado] || 'est-pendiente';
+  var fecha = p.created_at ? new Date(p.created_at).toLocaleDateString('es-CR',{day:'2-digit',month:'2-digit',year:'numeric'}) : '';
+  var hora  = p.created_at ? new Date(p.created_at).toLocaleTimeString('es-CR',{hour:'2-digit',minute:'2-digit'}) : '';
+  var stepIdx = ESTADOS.indexOf(p.estado);
+
+  // Header
+  var html = '<div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:.5rem;margin-bottom:.6rem;">'
+    + '<div>'
+    + '<div style="font-size:.92rem;font-weight:700;">' + p.cliente
+    + ' <span style="color:var(--muted);font-weight:400;font-size:.8rem;">— ' + (p.proyecto||'Sin proyecto') + '</span></div>'
+    + '<div style="font-size:.72rem;color:var(--muted);margin-top:2px;">👤 ' + p.asesor + ' &nbsp;·&nbsp; 📅 ' + fecha + ' ' + hora
+    + (_esAdmin && p.asesor_confirmo ? ' &nbsp;·&nbsp; ✅ Entrega confirmada' : '')
+    + (_esAdmin && p.asesor_facturo  ? ' &nbsp;·&nbsp; ✅ Factura confirmada' : '')
+    + '</div></div>'
+    + '<span class="ped-estado ' + estadoCss + '">' + (ESTADO_ICO[p.estado]||'') + ' ' + p.estado + '</span>'
+    + '</div>';
+
+  // Progress bar
+  html += '<div class="ped-prog">';
+  ESTADOS.forEach(function(e, i) {
+    var done = i <= stepIdx;
+    var isNext = _esAdmin && i === stepIdx+1;
+    html += '<div class="ped-step' + (done?' done':'') + (isNext?' admin-btn':'') + '"'
+      + (isNext ? ' onclick="avanzarEstado('+p.id+',\''+e+'\')" title="Marcar como '+e+'"' : '')
+      + '>' + ESTADO_ICO[e] + ' ' + e + '</div>';
+  });
+  html += '</div>';
+
+  // Productos
+  var prods = (p.productos||'').split('\n').filter(Boolean);
+  html += '<div style="margin:.5rem 0;max-height:120px;overflow-y:auto;">';
+  prods.forEach(function(pr) {
+    html += '<div style="font-size:.76rem;padding:.2rem 0;border-bottom:1px solid var(--border);font-family:\'DM Mono\',monospace;">' + pr + '</div>';
+  });
+  html += '</div>';
+
+  // Referencias
+  if(p.num_solicitud || p.pi_hikvision || p.num_factura) {
+    html += '<div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.45rem;">';
+    if(p.num_solicitud) html += '<span style="font-size:.71rem;background:rgba(224,92,10,.1);color:var(--accent);padding:.22rem .6rem;border-radius:6px;font-weight:700;">📋 Sek: '+p.num_solicitud+'</span>';
+    if(p.pi_hikvision)  html += '<span style="font-size:.71rem;background:rgba(37,99,200,.1);color:#2563c8;padding:.22rem .6rem;border-radius:6px;font-weight:700;">🏷️ PI: '+p.pi_hikvision+'</span>';
+    if(p.num_factura)   html += '<span style="font-size:.71rem;background:rgba(34,197,94,.15);color:#16a34a;padding:.22rem .6rem;border-radius:6px;font-weight:700;">🧾 Factura: '+p.num_factura+'</span>';
+    html += '</div>';
+  }
+
+  // Documentos
+  if(p.orden_compra_url || p.cotizacion_url) {
+    html += '<div style="display:flex;gap:.5rem;margin-top:.5rem;flex-wrap:wrap;">';
+    if(p.orden_compra_url) html += '<span style="font-size:.71rem;background:rgba(37,99,200,.1);color:#2563c8;padding:.22rem .6rem;border-radius:6px;">📎 OC: '+p.orden_compra_url+'</span>';
+    if(p.cotizacion_url)   html += '<span style="font-size:.71rem;background:rgba(167,139,250,.1);color:#a78bfa;padding:.22rem .6rem;border-radius:6px;">📄 Cot: '+p.cotizacion_url+'</span>';
+    html += '</div>';
+  }
+
+  // Notas
+  if(p.notas) html += '<div style="font-size:.75rem;color:var(--muted);margin-top:.4rem;font-style:italic;">📝 ' + p.notas + '</div>';
+
+  // Admin: cambiar estado + referencias internas
+  if(_esAdmin) {
+    html += '<div style="margin-top:.75rem;">';
+    html += '<div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;margin-bottom:.6rem;">';
+    html += '<span style="font-size:.72rem;color:var(--muted);font-weight:600;">Mover estado:</span>';
+    ESTADOS.forEach(function(e) {
+      if(e !== p.estado) {
+        html += '<button onclick="cambiarEstado('+p.id+',\''+e+'\')"'
+          + ' style="background:var(--surface2);border:1px solid var(--border);color:var(--muted);padding:.2rem .55rem;border-radius:6px;cursor:pointer;font-family:inherit;font-size:.7rem;"'
+          + ' onmouseover="this.style.borderColor=\'var(--accent)\'" onmouseout="this.style.borderColor=\'var(--border)\'"'
+          + '>' + ESTADO_ICO[e] + ' ' + e + '</button>';
+      }
     });
-    const p = _pedidos.find(x=>x.id===id);
-    if(p){ p.num_solicitud=numSol; p.pi_hikvision=piHik; }
-    mostrarToast('✅ Referencias guardadas');
-  } catch(e) { mostrarToast('Error: '+e.message,'#f87171'); }
+    html += '</div>';
+    // Refs fields
+    html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;padding:.7rem;background:var(--surface2);border-radius:8px;border:1px solid var(--border);">';
+    html += '<div><div style="font-size:.65rem;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.07em;margin-bottom:.25rem;">📋 # Solicitud Sekunet</div>'
+      + '<div style="display:flex;gap:5px;">'
+      + '<input type="text" id="num-sol-'+p.id+'" value="'+(p.num_solicitud||'')+'" placeholder="SEK-2026-001"'
+      + ' style="flex:1;padding:.32rem .55rem;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-family:inherit;font-size:.78rem;"/>'
+      + '<button onclick="guardarRefs('+p.id+')" style="background:var(--accent);color:#fff;border:none;padding:.32rem .6rem;border-radius:6px;cursor:pointer;font-size:.72rem;font-weight:600;">✓</button>'
+      + '</div></div>';
+    html += '<div><div style="font-size:.65rem;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.07em;margin-bottom:.25rem;">🏷️ PI Hikvision</div>'
+      + '<div style="display:flex;gap:5px;">'
+      + '<input type="text" id="pi-hik-'+p.id+'" value="'+(p.pi_hikvision||'')+'" placeholder="PI-2026-12345"'
+      + ' style="flex:1;padding:.32rem .55rem;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-family:inherit;font-size:.78rem;"/>'
+      + '<button onclick="guardarRefs('+p.id+')" style="background:var(--accent);color:#fff;border:none;padding:.32rem .6rem;border-radius:6px;cursor:pointer;font-size:.72rem;font-weight:600;">✓</button>'
+      + '</div></div>';
+    html += '</div></div>';
+  }
+
+  // Asesor: confirmar entrega
+  if(!_esAdmin && p.estado==='Entregado') {
+    html += '<div style="margin-top:.7rem;padding:.65rem;background:var(--surface2);border-radius:8px;border:1px solid var(--border);">';
+    if(!p.asesor_confirmo) {
+      html += '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:.8rem;font-weight:600;">'
+        + '<input type="checkbox" onchange="confirmarEntrega('+p.id+',this.checked)"/> Confirmar que se entregó al cliente</label>';
+    } else {
+      html += '<div style="font-size:.8rem;color:#16a34a;font-weight:600;">✅ Entrega confirmada al cliente</div>';
+      // Confirmar factura
+      html += '<div style="margin-top:.5rem;">';
+      if(!p.asesor_facturo) {
+        html += '<div style="font-size:.78rem;font-weight:600;margin-bottom:.4rem;">🧾 Número de factura Sekunet</div>'
+          + '<div style="display:flex;gap:6px;margin-bottom:.4rem;">'
+          + '<input type="text" id="fac-'+p.id+'" value="'+(p.num_factura||'')+'" placeholder="Número de factura"'
+          + ' style="flex:1;padding:.38rem .6rem;border-radius:7px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-family:inherit;font-size:.8rem;"/>'
+          + '</div>'
+          + '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:.78rem;">'
+          + '<input type="checkbox" onchange="confirmarFactura('+p.id+',this.checked)"/> Confirmar que fue facturado por Sekunet</label>';
+      } else {
+        html += '<div style="display:flex;align-items:center;gap:8px;">'
+          + '<span style="color:#16a34a;">✅</span>'
+          + '<span style="font-size:.78rem;">Facturado confirmado</span>'
+          + (p.num_factura ? '<span style="background:rgba(34,197,94,.15);color:#16a34a;padding:.18rem .55rem;border-radius:6px;font-size:.76rem;font-weight:700;">🧾 '+p.num_factura+'</span>' : '')
+          + '</div>';
+      }
+      html += '</div>';
+    }
+    html += '</div>';
+  }
+
+  card.innerHTML = html;
+  return card;
 }
 
 async function cambiarEstado(id, nuevoEstado) {
   try {
-    await fetch('https://loldcmqaklfpmvnxkxbu.supabase.co/rest/v1/solicitudes_pedido?id=eq.' + id, {
+    await fetch(SB_URL_P+'/rest/v1/solicitudes_pedido?id=eq.'+id, {
       method:'PATCH', mode:'cors',
-      headers: {
-        'Content-Type':'application/json',
-        'apikey':'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxvbGRjbXFha2xmcG12bnhreGJ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU2MTgyMTksImV4cCI6MjEwMTE5NDIxOX0.RI6FcpDz_Z4WBPvmsT0Jx76OVCzqXFZ6sR0LoKUokKo',
-        'Authorization':'Bearer '+(_sbSession?.access_token||'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxvbGRjbXFha2xmcG12bnhreGJ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU2MTgyMTksImV4cCI6MjEwMTE5NDIxOX0.RI6FcpDz_Z4WBPvmsT0Jx76OVCzqXFZ6sR0LoKUokKo'),
-        'Prefer':'return=minimal'
-      },
+      headers: _sbHeaders(),
       body: JSON.stringify({estado: nuevoEstado})
     });
-    // Update local data
-    const p = _pedidos.find(x=>x.id===id);
+    var p = _pedidos.find(function(x){ return x.id===id; });
     if(p) p.estado = nuevoEstado;
     renderPedidos();
-    mostrarToast('✅ Estado actualizado: ' + nuevoEstado);
+    mostrarToast('✅ Estado: ' + nuevoEstado);
   } catch(e) { mostrarToast('Error: '+e.message,'#f87171'); }
 }
 
@@ -2767,20 +2775,30 @@ async function avanzarEstado(id, nuevoEstado) {
   await cambiarEstado(id, nuevoEstado);
 }
 
+async function guardarRefs(id) {
+  var numSol = (document.getElementById('num-sol-'+id)||{}).value||'';
+  var piHik  = (document.getElementById('pi-hik-'+id)||{}).value||'';
+  try {
+    await fetch(SB_URL_P+'/rest/v1/solicitudes_pedido?id=eq.'+id, {
+      method:'PATCH', mode:'cors',
+      headers: _sbHeaders(),
+      body: JSON.stringify({num_solicitud: numSol.trim(), pi_hikvision: piHik.trim()})
+    });
+    var p = _pedidos.find(function(x){ return x.id===id; });
+    if(p){ p.num_solicitud=numSol.trim(); p.pi_hikvision=piHik.trim(); }
+    mostrarToast('✅ Referencias guardadas');
+  } catch(e) { mostrarToast('Error: '+e.message,'#f87171'); }
+}
+
 async function confirmarEntrega(id, checked) {
   if(!checked) return;
   try {
-    await fetch('https://loldcmqaklfpmvnxkxbu.supabase.co/rest/v1/solicitudes_pedido?id=eq.' + id, {
+    await fetch(SB_URL_P+'/rest/v1/solicitudes_pedido?id=eq.'+id, {
       method:'PATCH', mode:'cors',
-      headers: {
-        'Content-Type':'application/json',
-        'apikey':'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxvbGRjbXFha2xmcG12bnhreGJ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU2MTgyMTksImV4cCI6MjEwMTE5NDIxOX0.RI6FcpDz_Z4WBPvmsT0Jx76OVCzqXFZ6sR0LoKUokKo',
-        'Authorization':'Bearer '+(_sbSession?.access_token||'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxvbGRjbXFha2xmcG12bnhreGJ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU2MTgyMTksImV4cCI6MjEwMTE5NDIxOX0.RI6FcpDz_Z4WBPvmsT0Jx76OVCzqXFZ6sR0LoKUokKo'),
-        'Prefer':'return=minimal'
-      },
+      headers: _sbHeaders(),
       body: JSON.stringify({asesor_confirmo: true})
     });
-    const p = _pedidos.find(x=>x.id===id);
+    var p = _pedidos.find(function(x){ return x.id===id; });
     if(p) p.asesor_confirmo = true;
     renderPedidos();
     mostrarToast('✅ Entrega confirmada');
@@ -2789,31 +2807,26 @@ async function confirmarEntrega(id, checked) {
 
 async function confirmarFactura(id, checked) {
   if(!checked) return;
-  const numFac = document.getElementById('fac-'+id)?.value.trim()||'';
-  if(!numFac){
+  var facEl = document.getElementById('fac-'+id);
+  var numFac = facEl ? facEl.value.trim() : '';
+  if(!numFac) {
     mostrarToast('⚠️ Ingresa el número de factura primero','#f59e0b');
-    document.getElementById('fac-'+id)?.focus();
-    // Uncheck the checkbox
+    if(facEl) facEl.focus();
     event.target.checked = false;
     return;
   }
   try {
-    await fetch('https://loldcmqaklfpmvnxkxbu.supabase.co/rest/v1/solicitudes_pedido?id=eq.' + id, {
+    await fetch(SB_URL_P+'/rest/v1/solicitudes_pedido?id=eq.'+id, {
       method:'PATCH', mode:'cors',
-      headers: {
-        'Content-Type':'application/json',
-        'apikey':'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxvbGRjbXFha2xmcG12bnhreGJ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU2MTgyMTksImV4cCI6MjEwMTE5NDIxOX0.RI6FcpDz_Z4WBPvmsT0Jx76OVCzqXFZ6sR0LoKUokKo',
-        'Authorization':'Bearer '+(_sbSession?.access_token||'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxvbGRjbXFha2xmcG12bnhreGJ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU2MTgyMTksImV4cCI6MjEwMTE5NDIxOX0.RI6FcpDz_Z4WBPvmsT0Jx76OVCzqXFZ6sR0LoKUokKo'),
-        'Prefer':'return=minimal'
-      },
+      headers: _sbHeaders(),
       body: JSON.stringify({asesor_facturo: true, estado: 'Facturado', num_factura: numFac})
     });
-    const p = _pedidos.find(x=>x.id===id);
-    if(p) { p.asesor_facturo=true; p.estado='Facturado'; p.num_factura=numFac; }
+    var p = _pedidos.find(function(x){ return x.id===id; });
+    if(p){ p.asesor_facturo=true; p.estado='Facturado'; p.num_factura=numFac; }
     renderPedidos();
-    mostrarToast('✅ Facturación confirmada — Factura: '+numFac);
+    mostrarToast('✅ Facturación confirmada — '+numFac);
   } catch(e) { mostrarToast('Error: '+e.message,'#f87171'); }
 }
-</script>
 
+</script>
 </body></html>
