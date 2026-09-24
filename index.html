@@ -2371,23 +2371,30 @@ function buscarSolModelo(inp){
     }
   }
   if(!res.length){ drop.style.display='none'; return; }
-  drop.innerHTML = res.map(({p,i}) => {
-    const stock = typeof STOCK_PANAMA!=='undefined' && STOCK_PANAMA[p.n]
-      ? `<span style="color:#22c55e;font-size:.65rem;font-weight:700;"> 📦${STOCK_PANAMA[p.n]}</span>` : '';
-    const marca = p.marca==='PDS'
-      ? `<span style="background:rgba(34,197,94,.15);color:#22c55e;font-size:.6rem;padding:1px 5px;border-radius:4px;font-weight:700;">PDS</span>`
+  drop.innerHTML = '';
+  res.forEach(function(obj){
+    const p = obj.p;
+    const stockTxt = (typeof STOCK_PANAMA!=='undefined' && STOCK_PANAMA[p.n])
+      ? ' <span style="color:#22c55e;font-size:.65rem;font-weight:700;">📦'+STOCK_PANAMA[p.n]+'</span>' : '';
+    const marcaTxt = p.marca==='PDS'
+      ? '<span style="background:rgba(34,197,94,.15);color:#22c55e;font-size:.6rem;padding:1px 5px;border-radius:4px;font-weight:700;">PDS</span>'
       : p.marca==='HiLook'
-      ? `<span style="background:rgba(37,99,200,.15);color:#60a5fa;font-size:.6rem;padding:1px 5px;border-radius:4px;font-weight:700;">HiLook</span>`
-      : `<span style="background:rgba(224,92,10,.12);color:#e05c0a;font-size:.6rem;padding:1px 5px;border-radius:4px;font-weight:700;">HIK</span>`;
-    return `<div onclick="seleccionarSolModelo(this,'${p.n.replace(/'/g,\"&#39;\")}','${p.cat}')"
-      style="padding:.42rem .7rem;cursor:pointer;border-bottom:1px solid var(--border);transition:background .12s;"
-      onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''">
-      <div style="font-size:.76rem;font-weight:500;">${p.n} ${marca}${stock}</div>
-      <div style="font-size:.65rem;color:var(--muted);">${p.cat}${p.sub?' · '+p.sub:''}</div>
-    </div>`;
-  }).join('');
+      ? '<span style="background:rgba(37,99,200,.15);color:#60a5fa;font-size:.6rem;padding:1px 5px;border-radius:4px;font-weight:700;">HiLook</span>'
+      : '<span style="background:rgba(224,92,10,.12);color:#e05c0a;font-size:.6rem;padding:1px 5px;border-radius:4px;font-weight:700;">HIK</span>';
+    var div = document.createElement('div');
+    div.style.cssText = 'padding:.42rem .7rem;cursor:pointer;border-bottom:1px solid var(--border);transition:background .12s;';
+    div.innerHTML = '<div style="font-size:.76rem;font-weight:500;">'+p.n+' '+marcaTxt+stockTxt+'</div>'
+      +'<div style="font-size:.65rem;color:var(--muted);">'+p.cat+(p.sub?' · '+p.sub:'')+'</div>';
+    div.addEventListener('mouseover', function(){ this.style.background='var(--surface2)'; });
+    div.addEventListener('mouseout',  function(){ this.style.background=''; });
+    (function(nombre, categoria){ 
+      div.addEventListener('click', function(){ seleccionarSolModelo(div, nombre, categoria); });
+    })(p.n, p.cat);
+    drop.appendChild(div);
+  });
   drop.style.display = 'block';
 }
+
 
 function seleccionarSolModelo(el, modelo, cat){
   const drop = el.parentElement;
