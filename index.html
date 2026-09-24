@@ -2663,51 +2663,41 @@ function renderPedidos() {
             + '<span style="font-size:.78rem;">Facturado confirmado</span>'
             + (p.num_factura ? '<span style="background:rgba(34,197,94,.15);color:#16a34a;padding:.18rem .55rem;border-radius:6px;font-size:.76rem;font-weight:700;">🧾 '+p.num_factura+'</span>' : '')
             + '</div>')
-        + '</div>'
-      : 
+        + '</div>';
+    }
 
     // Admin actions
-    const adminHtml = _esAdmin ? `
-      <div style="margin-top:.75rem;">
-        <div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;margin-bottom:.6rem;">
-          <span style="font-size:.72rem;color:var(--muted);font-weight:600;">Mover estado:</span>
-          ${ESTADOS.map(e => e!==p.estado ? `<button onclick="cambiarEstado(${p.id},'${e}')"
-            style="background:var(--surface2);border:1px solid var(--border);color:var(--muted);padding:.2rem .55rem;border-radius:6px;cursor:pointer;font-family:inherit;font-size:.7rem;transition:all .15s;"
-            onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'"
-            >${ESTADO_ICO[e]} ${e}</button>` : '').join('')}
-        </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;padding:.7rem;background:var(--surface2);border-radius:8px;border:1px solid var(--border);">
-          <div>
-            <div style="font-size:.65rem;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.07em;margin-bottom:.25rem;">📋 # Solicitud Sekunet</div>
-            <div style="display:flex;gap:5px;">
-              <input type="text" id="num-sol-${p.id}" value="${p.num_solicitud||''}" placeholder="Ej: SEK-2026-001"
-                style="flex:1;padding:.32rem .55rem;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-family:inherit;font-size:.78rem;font-weight:600;"/>
-              <button onclick="guardarRefs(${p.id})" style="background:var(--accent);color:#fff;border:none;padding:.32rem .6rem;border-radius:6px;cursor:pointer;font-size:.72rem;font-weight:600;">✓</button>
-            </div>
-          </div>
-          <div>
-            <div style="font-size:.65rem;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.07em;margin-bottom:.25rem;">🏷️ PI Hikvision</div>
-            <div style="display:flex;gap:5px;">
-              <input type="text" id="pi-hik-${p.id}" value="${p.pi_hikvision||''}" placeholder="Ej: PI-2026-12345"
-                style="flex:1;padding:.32rem .55rem;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-family:inherit;font-size:.78rem;font-weight:600;"/>
-              <button onclick="guardarRefs(${p.id})" style="background:var(--accent);color:#fff;border:none;padding:.32rem .6rem;border-radius:6px;cursor:pointer;font-size:.72rem;font-weight:600;">✓</button>
-            </div>
-          </div>
-        </div>
-      </div>` : '';
+    var adminHtml = '';
+    if(_esAdmin) {
+      var estadoBtns = ESTADOS.filter(function(e){ return e!==p.estado; }).map(function(e){
+        return '<button onclick="cambiarEstado('+p.id+',\''+e+'\')"'
+          +' style="background:var(--surface2);border:1px solid var(--border);color:var(--muted);padding:.2rem .55rem;border-radius:6px;cursor:pointer;font-family:inherit;font-size:.7rem;transition:all .15s;"'
+          +' onmouseover="this.style.borderColor=\'var(--accent)\'" onmouseout="this.style.borderColor=\'var(--border)\'"'
+          +'>'+ESTADO_ICO[e]+' '+e+'</button>';
+      }).join('');
 
-    // Referencias internas (visible para asesor también)
-    const refsHtml = (p.num_solicitud||p.pi_hikvision||p.num_factura) ? `
-      <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.45rem;">
-        ${p.num_solicitud?`<span style="font-size:.71rem;background:rgba(224,92,10,.1);color:var(--accent);padding:.22rem .6rem;border-radius:6px;font-weight:700;">📋 Sek: ${p.num_solicitud}</span>`:''}
-        ${p.pi_hikvision?`<span style="font-size:.71rem;background:rgba(37,99,200,.1);color:#2563c8;padding:.22rem .6rem;border-radius:6px;font-weight:700;">🏷️ PI: ${p.pi_hikvision}</span>`:''}
-        ${p.num_factura?`<span style="font-size:.71rem;background:rgba(34,197,94,.15);color:#16a34a;padding:.22rem .6rem;border-radius:6px;font-weight:700;">🧾 Factura: ${p.num_factura}</span>`:''}
-      </div>` : '';
-
-    // Documentos
-    const docsHtml = (p.orden_compra_url||p.cotizacion_url) ? `
-      <div style="display:flex;gap:.5rem;margin-top:.5rem;flex-wrap:wrap;">
-        ${p.orden_compra_url?`<span style="font-size:.71rem;background:rgba(37,99,200,.1);color:#2563c8;padding:.2rem .55rem;border-radius:6px;">📎 OC: ${p.orden_compra_url}</span>`:''}        ${p.cotizacion_url?`<span style="font-size:.71rem;background:rgba(167,139,250,.1);color:#a78bfa;padding:.2rem .55rem;border-radius:6px;">📄 Cotización: ${p.cotizacion_url}</span>`:''}      </div>` : '';
+      adminHtml = '<div style="margin-top:.75rem;">'
+        + '<div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;margin-bottom:.6rem;">'
+        + '<span style="font-size:.72rem;color:var(--muted);font-weight:600;">Mover estado:</span>'
+        + estadoBtns
+        + '</div>'
+        + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;padding:.7rem;background:var(--surface2);border-radius:8px;border:1px solid var(--border);">'
+        + '<div>'
+        + '<div style="font-size:.65rem;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.07em;margin-bottom:.25rem;">📋 # Solicitud Sekunet</div>'
+        + '<div style="display:flex;gap:5px;">'
+        + '<input type="text" id="num-sol-'+p.id+'" value="'+(p.num_solicitud||'')+'" placeholder="Ej: SEK-2026-001"'
+        + ' style="flex:1;padding:.32rem .55rem;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-family:inherit;font-size:.78rem;font-weight:600;"/>'
+        + '<button onclick="guardarRefs('+p.id+')" style="background:var(--accent);color:#fff;border:none;padding:.32rem .6rem;border-radius:6px;cursor:pointer;font-size:.72rem;font-weight:600;">✓</button>'
+        + '</div></div>'
+        + '<div>'
+        + '<div style="font-size:.65rem;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.07em;margin-bottom:.25rem;">🏷️ PI Hikvision</div>'
+        + '<div style="display:flex;gap:5px;">'
+        + '<input type="text" id="pi-hik-'+p.id+'" value="'+(p.pi_hikvision||'')+'" placeholder="Ej: PI-2026-12345"'
+        + ' style="flex:1;padding:.32rem .55rem;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-family:inherit;font-size:.78rem;font-weight:600;"/>'
+        + '<button onclick="guardarRefs('+p.id+')" style="background:var(--accent);color:#fff;border:none;padding:.32rem .6rem;border-radius:6px;cursor:pointer;font-size:.72rem;font-weight:600;">✓</button>'
+        + '</div></div>'
+        + '</div></div>';
+    }
 
     return `<div class="ped-card">
       <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:.5rem;margin-bottom:.6rem;">
