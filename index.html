@@ -2648,21 +2648,60 @@ function renderPedidos() {
         </div>` : '';
 
     const chkFactura = !_esAdmin && p.estado==='Entregado' && p.asesor_confirmo
-      ? `<div style="margin-top:.4rem;padding:.65rem;background:var(--surface2);border-radius:8px;border:1px solid var(--border);">
-          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:.8rem;font-weight:600;">
-            <input type="checkbox" onchange="confirmarFactura(${p.id},this.checked)" ${p.asesor_facturo?'checked disabled':''}/> 
-            ${p.asesor_facturo ? '✅ Confirmé que fue facturado' : 'Confirmar que fue facturado por Sekunet'}
-          </label>
-        </div>` : '';
+      ? '<div style="margin-top:.4rem;padding:.65rem;background:var(--surface2);border-radius:8px;border:1px solid var(--border);">'
+        + '<div style="font-size:.78rem;font-weight:600;margin-bottom:.45rem;">🧾 Confirmar facturación</div>'
+        + (!p.asesor_facturo
+          ? '<div style="display:flex;gap:6px;margin-bottom:.4rem;">'
+            + '<input type="text" id="fac-'+p.id+'" placeholder="Número de factura Sekunet" value="'+(p.num_factura||'')+'"'
+            + ' style="flex:1;padding:.38rem .6rem;border-radius:7px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-family:inherit;font-size:.8rem;"/>'
+            + '</div>'
+            + '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:.78rem;">'
+            + '<input type="checkbox" onchange="confirmarFactura('+p.id+',this.checked)"/>'
+            + ' Confirmar que fue facturado por Sekunet</label>'
+          : '<div style="display:flex;align-items:center;gap:8px;">'
+            + '<span style="color:#16a34a;font-size:.9rem;">✅</span>'
+            + '<span style="font-size:.78rem;">Facturado confirmado</span>'
+            + (p.num_factura ? '<span style="background:rgba(34,197,94,.15);color:#16a34a;padding:.18rem .55rem;border-radius:6px;font-size:.76rem;font-weight:700;">🧾 '+p.num_factura+'</span>' : '')
+            + '</div>')
+        + '</div>'
+      : 
 
     // Admin actions
     const adminHtml = _esAdmin ? `
-      <div style="margin-top:.75rem;display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;">
-        <span style="font-size:.72rem;color:var(--muted);font-weight:600;">Mover estado:</span>
-        ${ESTADOS.map(e => e!==p.estado ? `<button onclick="cambiarEstado(${p.id},'${e}')"
-          style="background:var(--surface2);border:1px solid var(--border);color:var(--muted);padding:.2rem .55rem;border-radius:6px;cursor:pointer;font-family:inherit;font-size:.7rem;transition:all .15s;"
-          onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'"
-          >${ESTADO_ICO[e]} ${e}</button>` : '').join('')}
+      <div style="margin-top:.75rem;">
+        <div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;margin-bottom:.6rem;">
+          <span style="font-size:.72rem;color:var(--muted);font-weight:600;">Mover estado:</span>
+          ${ESTADOS.map(e => e!==p.estado ? `<button onclick="cambiarEstado(${p.id},'${e}')"
+            style="background:var(--surface2);border:1px solid var(--border);color:var(--muted);padding:.2rem .55rem;border-radius:6px;cursor:pointer;font-family:inherit;font-size:.7rem;transition:all .15s;"
+            onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'"
+            >${ESTADO_ICO[e]} ${e}</button>` : '').join('')}
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;padding:.7rem;background:var(--surface2);border-radius:8px;border:1px solid var(--border);">
+          <div>
+            <div style="font-size:.65rem;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.07em;margin-bottom:.25rem;">📋 # Solicitud Sekunet</div>
+            <div style="display:flex;gap:5px;">
+              <input type="text" id="num-sol-${p.id}" value="${p.num_solicitud||''}" placeholder="Ej: SEK-2026-001"
+                style="flex:1;padding:.32rem .55rem;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-family:inherit;font-size:.78rem;font-weight:600;"/>
+              <button onclick="guardarRefs(${p.id})" style="background:var(--accent);color:#fff;border:none;padding:.32rem .6rem;border-radius:6px;cursor:pointer;font-size:.72rem;font-weight:600;">✓</button>
+            </div>
+          </div>
+          <div>
+            <div style="font-size:.65rem;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.07em;margin-bottom:.25rem;">🏷️ PI Hikvision</div>
+            <div style="display:flex;gap:5px;">
+              <input type="text" id="pi-hik-${p.id}" value="${p.pi_hikvision||''}" placeholder="Ej: PI-2026-12345"
+                style="flex:1;padding:.32rem .55rem;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-family:inherit;font-size:.78rem;font-weight:600;"/>
+              <button onclick="guardarRefs(${p.id})" style="background:var(--accent);color:#fff;border:none;padding:.32rem .6rem;border-radius:6px;cursor:pointer;font-size:.72rem;font-weight:600;">✓</button>
+            </div>
+          </div>
+        </div>
+      </div>` : '';
+
+    // Referencias internas (visible para asesor también)
+    const refsHtml = (p.num_solicitud||p.pi_hikvision||p.num_factura) ? `
+      <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.45rem;">
+        ${p.num_solicitud?`<span style="font-size:.71rem;background:rgba(224,92,10,.1);color:var(--accent);padding:.22rem .6rem;border-radius:6px;font-weight:700;">📋 Sek: ${p.num_solicitud}</span>`:''}
+        ${p.pi_hikvision?`<span style="font-size:.71rem;background:rgba(37,99,200,.1);color:#2563c8;padding:.22rem .6rem;border-radius:6px;font-weight:700;">🏷️ PI: ${p.pi_hikvision}</span>`:''}
+        ${p.num_factura?`<span style="font-size:.71rem;background:rgba(34,197,94,.15);color:#16a34a;padding:.22rem .6rem;border-radius:6px;font-weight:700;">🧾 Factura: ${p.num_factura}</span>`:''}
       </div>` : '';
 
     // Documentos
@@ -2684,6 +2723,7 @@ function renderPedidos() {
       </div>
       <div class="ped-prog">${progHtml}</div>
       <div style="margin:.5rem 0;max-height:120px;overflow-y:auto;">${prodsHtml}</div>
+      ${refsHtml}
       ${docsHtml}
       ${p.notas?`<div style="font-size:.75rem;color:var(--muted);margin-top:.4rem;font-style:italic;">📝 ${p.notas}</div>`:''}
       ${adminHtml}
@@ -2691,6 +2731,26 @@ function renderPedidos() {
       ${chkFactura}
     </div>`;
   }).join('');
+}
+
+async function guardarRefs(id) {
+  const numSol = document.getElementById('num-sol-'+id)?.value.trim()||'';
+  const piHik  = document.getElementById('pi-hik-'+id)?.value.trim()||'';
+  try {
+    await fetch('https://loldcmqaklfpmvnxkxbu.supabase.co/rest/v1/solicitudes_pedido?id=eq.'+id, {
+      method:'PATCH', mode:'cors',
+      headers:{
+        'Content-Type':'application/json',
+        'apikey':'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxvbGRjbXFha2xmcG12bnhreGJ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU2MTgyMTksImV4cCI6MjEwMTE5NDIxOX0.RI6FcpDz_Z4WBPvmsT0Jx76OVCzqXFZ6sR0LoKUokKo',
+        'Authorization':'Bearer '+(_sbSession?.access_token||'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxvbGRjbXFha2xmcG12bnhreGJ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU2MTgyMTksImV4cCI6MjEwMTE5NDIxOX0.RI6FcpDz_Z4WBPvmsT0Jx76OVCzqXFZ6sR0LoKUokKo'),
+        'Prefer':'return=minimal'
+      },
+      body: JSON.stringify({num_solicitud: numSol, pi_hikvision: piHik})
+    });
+    const p = _pedidos.find(x=>x.id===id);
+    if(p){ p.num_solicitud=numSol; p.pi_hikvision=piHik; }
+    mostrarToast('✅ Referencias guardadas');
+  } catch(e) { mostrarToast('Error: '+e.message,'#f87171'); }
 }
 
 async function cambiarEstado(id, nuevoEstado) {
@@ -2739,6 +2799,14 @@ async function confirmarEntrega(id, checked) {
 
 async function confirmarFactura(id, checked) {
   if(!checked) return;
+  const numFac = document.getElementById('fac-'+id)?.value.trim()||'';
+  if(!numFac){
+    mostrarToast('⚠️ Ingresa el número de factura primero','#f59e0b');
+    document.getElementById('fac-'+id)?.focus();
+    // Uncheck the checkbox
+    event.target.checked = false;
+    return;
+  }
   try {
     await fetch('https://loldcmqaklfpmvnxkxbu.supabase.co/rest/v1/solicitudes_pedido?id=eq.' + id, {
       method:'PATCH', mode:'cors',
@@ -2748,12 +2816,12 @@ async function confirmarFactura(id, checked) {
         'Authorization':'Bearer '+(_sbSession?.access_token||'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxvbGRjbXFha2xmcG12bnhreGJ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU2MTgyMTksImV4cCI6MjEwMTE5NDIxOX0.RI6FcpDz_Z4WBPvmsT0Jx76OVCzqXFZ6sR0LoKUokKo'),
         'Prefer':'return=minimal'
       },
-      body: JSON.stringify({asesor_facturo: true, estado: 'Facturado'})
+      body: JSON.stringify({asesor_facturo: true, estado: 'Facturado', num_factura: numFac})
     });
     const p = _pedidos.find(x=>x.id===id);
-    if(p) { p.asesor_facturo=true; p.estado='Facturado'; }
+    if(p) { p.asesor_facturo=true; p.estado='Facturado'; p.num_factura=numFac; }
     renderPedidos();
-    mostrarToast('✅ Facturación confirmada');
+    mostrarToast('✅ Facturación confirmada — Factura: '+numFac);
   } catch(e) { mostrarToast('Error: '+e.message,'#f87171'); }
 }
 </script>
