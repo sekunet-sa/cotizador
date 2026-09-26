@@ -429,8 +429,8 @@ textarea{resize:vertical;min-height:56px;font-size:.82rem;}
     <span class="logo-product">Cotizador Pro</span>
   </a>
   <div style="display:flex;gap:4px;background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:3px;">
-    <button id="modTab-cotizador" onclick="setModulo('cotizador')" style="background: none; border-width: medium; border-style: none; border-color: currentcolor; border-image: none; border-radius: 7px; padding: 0.3rem 0.85rem; font-family: inherit; font-size: 0.78rem; font-weight: 600; cursor: pointer; color: var(--muted); transition: 0.2s; box-shadow: none;">📊 Cotizador</button>
-    <button id="modTab-pedidos" onclick="setModulo('pedidos')" style="background: var(--surface); border-width: medium; border-style: none; border-color: currentcolor; border-image: none; border-radius: 7px; padding: 0.3rem 0.85rem; font-family: inherit; font-size: 0.78rem; font-weight: 600; cursor: pointer; color: var(--text); transition: 0.2s; box-shadow: rgba(0, 0, 0, 0.15) 0px 1px 4px;">🛒 Pedidos</button>
+    <button id="modTab-cotizador" onclick="setModulo('cotizador')" style="background: var(--surface); border-width: medium; border-style: none; border-color: currentcolor; border-image: none; border-radius: 7px; padding: 0.3rem 0.85rem; font-family: inherit; font-size: 0.78rem; font-weight: 600; cursor: pointer; color: var(--text); transition: 0.2s; box-shadow: rgba(0, 0, 0, 0.15) 0px 1px 4px;">📊 Cotizador</button>
+    <button id="modTab-pedidos" onclick="setModulo('pedidos')" style="background: none; border-width: medium; border-style: none; border-color: currentcolor; border-image: none; border-radius: 7px; padding: 0.3rem 0.85rem; font-family: inherit; font-size: 0.78rem; font-weight: 600; cursor: pointer; color: var(--muted); transition: 0.2s; box-shadow: none;">🛒 Pedidos</button>
   </div>
   <div class="hdr-right">
     <button class="theme-toggle" onclick="toggleTheme()" id="themeBtn" title="Cambiar tema">🌙</button>
@@ -443,7 +443,7 @@ textarea{resize:vertical;min-height:56px;font-size:.82rem;}
   </div>
 </div>
 
-<div id="modCotizador" style="display: none;"><div class="layout">
+<div id="modCotizador"><div class="layout">
 <div class="left">
 
   <div>
@@ -680,7 +680,7 @@ textarea{resize:vertical;min-height:56px;font-size:.82rem;}
 </div><!-- /modCotizador -->
 
 <!-- ══ MÓDULO PEDIDOS ══════════════════════════════════ -->
-<div id="modPedidos" style="padding: 1.4rem 1.6rem;">
+<div id="modPedidos" style="padding: 1.4rem 1.6rem; display: none;">
 
   <!-- Toolbar pedidos -->
   <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.7rem;margin-bottom:1.1rem;">
@@ -1514,8 +1514,14 @@ async function guardarPin(i) {
       inp.value = '';
     } else {
       const d = await res.json().catch(() => ({}));
+      const detalle = d.message || d.hint || d.details || d.error || ('HTTP ' + res.status);
       msg.style.color = '#f87171';
-      msg.textContent = '❌ Error: ' + (d.message || d.error || res.status);
+      // RLS bloqueando UPDATE es el error más común
+      if(res.status === 0 || detalle.toLowerCase().includes('rls') || detalle.toLowerCase().includes('policy') || res.status === 403) {
+        msg.textContent = '❌ Sin permiso — agregá política UPDATE en Supabase para la tabla user_pins (to: anon)';
+      } else {
+        msg.textContent = '❌ Error ' + res.status + ': ' + detalle;
+      }
     }
   } catch(e) {
     msg.style.color = '#f87171';
