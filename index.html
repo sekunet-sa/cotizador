@@ -438,7 +438,7 @@ textarea{resize:vertical;min-height:56px;font-size:.82rem;}
     <button class="btn btn-ghost btn-sm" onclick="exportCSV()">📊 CSV</button>
     <button class="btn btn-ghost btn-sm" onclick="generarPDF()">📄 PDF</button>
     <button class="btn btn-ghost btn-sm" onclick="printQuote()">🖨 Imprimir</button>
-    <button class="btn btn-ghost btn-sm" onclick="openAdmin()">⚙️ Admin</button>
+    <button class="btn btn-ghost btn-sm" id="btnAdmin" onclick="openAdmin()" style="display:none;">⚙️ Admin</button>
     <button class="btn btn-primary btn-sm" id="btnSolicitar" onclick="abrirSolicitud()" style="background:linear-gradient(135deg,#2563c8,#3b82f6);box-shadow:0 2px 8px rgba(37,99,200,.3);">🛒 Solicitar pedido</button>
   </div>
 </div>
@@ -882,6 +882,8 @@ let F = {
 let MARGINS = { global:25, byList:{distribucion:22,proyecto:20}, byCat:{} };
 CATEGORIES.forEach(c=>{ MARGINS.byCat[c]=30; });
 
+let USUARIOS = [];  // Asesores del cotizador (nombre, usuario, clave)
+
 function getMargin(item){
   const bc=MARGINS.byCat[item.cat];
   if(bc!==null&&bc!==undefined) return bc;
@@ -1225,7 +1227,13 @@ function exportCSV(){
 }
 
 // ADMIN
-function openAdmin(){if(window._sekIsAdmin)adminUnlocked=true;document.getElementById('adminOverlay').classList.add('open');renderAdmin();}
+const _ADMIN_EMAILS = ['aescobar@sekunet.com', 'admin@sekunet.com'];
+function _esAdminEmail(){ return _ADMIN_EMAILS.indexOf((usuarioActivo?.email||'').toLowerCase()) >= 0; }
+function openAdmin(){
+  if(_esAdminEmail()) adminUnlocked = true;  // admin entra directo sin contraseña
+  document.getElementById('adminOverlay').classList.add('open');
+  renderAdmin();
+}
 function closeAdmin(){document.getElementById('adminOverlay').classList.remove('open');adminUnlocked=false;}
 document.getElementById('adminOverlay').addEventListener('click',e=>{
   if(e.target===document.getElementById('adminOverlay'))closeAdmin();
@@ -2168,7 +2176,14 @@ async function sbLogin() {
       _sbLoading('sbSpinner','sbBtnLogin', false);
       return;
     }
-    // Auth OK — guardar sesión temporal y pedir PIN
+    // Auth OK — verificar si está bloqueado antes de pedir PIN
+    const _EMAILS_BLOQUEADOS = ['calvarado@sekunet.com'];
+    if(_EMAILS_BLOQUEADOS.indexOf((email||'').toLowerCase()) >= 0){
+      err.textContent = '⛔ Acceso denegado. Contacta al administrador.';
+      _sbLoading('sbSpinner','sbBtnLogin', false);
+      return;
+    }
+    // Guardar sesión temporal y pedir PIN
     _pin2faSesion = data;
     _pin2faEmail  = email;
     _pin2faNombre = data.user?.user_metadata?.nombre || email.split('@')[0];
@@ -2244,6 +2259,15 @@ window.pinVerificar = async function() {
   const err = document.getElementById('sbPinErr');
   const btn = document.getElementById('sbBtnPin');
   const spn = document.getElementById('sbPinSpinner');
+
+  // ⛔ Emails bloqueados — acceso denegado sin importar PIN ni Supabase
+  const _EMAILS_BLOQUEADOS = ['calvarado@sekunet.com'];
+  if(_EMAILS_BLOQUEADOS.indexOf((_pin2faEmail||'').toLowerCase()) >= 0){
+    err.textContent = '⛔ Acceso denegado. Contacta al administrador.';
+    document.getElementById('sbPinInput').value = '';
+    return;
+  }
+
   if(!pinIngresado){ err.textContent = 'Ingresa tu PIN'; return; }
   if(!_pin2faEmail){ err.textContent = 'Sesión expirada, vuelve a iniciar sesión'; return; }
   err.textContent = '';
@@ -2277,6 +2301,9 @@ window.pinVerificar = async function() {
     document.getElementById('sessionUser').textContent = nombre;
     document.getElementById('sessionTime').textContent = 'Ingreso: ' +
       ahora.toLocaleString('es-CR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
+    // Mostrar botón Admin solo para administradores
+    const btnAdm = document.getElementById('btnAdmin');
+    if(btnAdm) btnAdm.style.display = _esAdminEmail() ? '' : 'none';
     const ca = document.getElementById('clientContact');
     if(ca && !ca.value) ca.value = nombre;
     _pin2faSesion = null; _pin2faEmail = ''; _pin2faNombre = '';
