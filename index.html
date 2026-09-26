@@ -2177,7 +2177,7 @@ function generarPDF() {
     <div class="login-err" id="totp-verify-err"></div>
     <button class="login-btn" id="totp-verify-btn" onclick="_totpVerificarLogin()" style="margin-top:.6rem">✓ Verificar y Entrar</button>
     <div style="text-align:center;margin-top:.75rem">
-      <button onclick="_2fa_sesion=null;_2fa_email=null;_sekShowPanel('pnl-login')"
+      <button onclick="_sekVolverLogin()"
         style="background:none;border:none;color:#5a6480;font-size:.78rem;cursor:pointer">
         ← Volver al login
       </button>
@@ -2208,6 +2208,11 @@ function generarPDF() {
   let _2fa_sesion  = null;   // sesión Supabase pendiente de verificar 2FA
   let _2fa_email   = null;   // email del login en curso
   let _totp_secret = null;   // secreto TOTP en memoria durante setup
+
+  window._sekVolverLogin = function() {
+    _2fa_sesion = null; _2fa_email = null; _totp_secret = null;
+    _sekShowPanel('pnl-login');
+  };
 
   /* Consulta Supabase con el token de sesión pendiente */
   async function _sbPedAuth(path, opts) {
