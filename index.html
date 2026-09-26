@@ -2137,6 +2137,53 @@ function generarPDF() {
     </div>
   </div>
 
+  <!-- ── PANEL: SETUP TOTP ── -->
+  <div id="pnl-totp-setup" style="display:none">
+    <div class="login-title" style="margin-bottom:.6rem">🔐 Configurar Autenticador</div>
+    <div style="font-size:.8rem;color:#8090b0;margin-bottom:.9rem;line-height:1.5;text-align:center">
+      Primera vez de <strong id="totp-setup-email" style="color:#e4e8f0"></strong><br>
+      Escaneá el código QR con <strong>Google Authenticator</strong>
+    </div>
+    <div style="text-align:center;margin-bottom:.8rem">
+      <img id="totp-setup-qr" src="" alt="QR TOTP" style="width:180px;height:180px;border-radius:8px;background:#fff;padding:6px">
+    </div>
+    <div style="font-size:.72rem;color:#8090b0;text-align:center;margin-bottom:.9rem">
+      ¿No podés escanear? Ingresá este código manualmente:<br>
+      <span id="totp-setup-secret" style="font-family:monospace;color:#e4e8f0;font-size:.78rem;letter-spacing:.1em;word-break:break-all"></span>
+    </div>
+    <div class="login-field">
+      <label style="text-align:center;display:block">Código de confirmación (6 dígitos)</label>
+      <input type="text" id="totp-setup-code" placeholder="000000" maxlength="6" inputmode="numeric"
+        style="font-size:1.6rem;letter-spacing:.5em;text-align:center;font-family:monospace;padding:.5rem;width:100%;background:var(--surface2,#1f2436);border:1px solid var(--border,#2b3150);color:var(--text,#e4e8f0);border-radius:8px"
+        onkeydown="if(event.key==='Enter')_totpConfirmarSetup()">
+    </div>
+    <div class="login-err" id="totp-setup-err"></div>
+    <button class="login-btn" id="totp-setup-btn" onclick="_totpConfirmarSetup()" style="margin-top:.6rem">✓ Confirmar y Entrar</button>
+  </div>
+
+  <!-- ── PANEL: VERIFICAR TOTP ── -->
+  <div id="pnl-totp-verify" style="display:none">
+    <div class="login-title" style="margin-bottom:.6rem">🔐 Verificación</div>
+    <div style="font-size:.84rem;color:#8090b0;margin-bottom:1.2rem;line-height:1.6;text-align:center">
+      Ingresá el código de <strong>Google Authenticator</strong><br>
+      <span id="totp-verify-email" style="color:#e4e8f0;font-size:.8rem;font-family:monospace"></span>
+    </div>
+    <div class="login-field">
+      <label style="text-align:center;display:block">Código de 6 dígitos</label>
+      <input type="text" id="totp-verify-code" placeholder="000000" maxlength="6" inputmode="numeric"
+        style="font-size:1.8rem;letter-spacing:.5em;text-align:center;font-family:monospace;padding:.6rem;width:100%;background:var(--surface2,#1f2436);border:1px solid var(--border,#2b3150);color:var(--text,#e4e8f0);border-radius:8px"
+        onkeydown="if(event.key==='Enter')_totpVerificarLogin()">
+    </div>
+    <div class="login-err" id="totp-verify-err"></div>
+    <button class="login-btn" id="totp-verify-btn" onclick="_totpVerificarLogin()" style="margin-top:.6rem">✓ Verificar y Entrar</button>
+    <div style="text-align:center;margin-top:.75rem">
+      <button onclick="_2fa_sesion=null;_2fa_email=null;_sekShowPanel('pnl-login')"
+        style="background:none;border:none;color:#5a6480;font-size:.78rem;cursor:pointer">
+        ← Volver al login
+      </button>
+    </div>
+  </div>
+
   <div class="login-footer" style="margin-top:1rem">
     Sekunet S.A. · Acceso exclusivo @sekunet.com · v1.6.0
   </div>
@@ -2157,32 +2204,184 @@ function generarPDF() {
   /* ══════════════════════════════════════════════════════════════
      INICIAR SESIÓN
   ══════════════════════════════════════════════════════════════ */
-  /* ── Estado 2FA ─────────────────────────────────────────────── */
-  let _2fa_codigo    = null;   // string 6 dígitos
-  let _2fa_expira    = null;   // timestamp ms
-  let _2fa_sesion    = null;   // objeto sesión Supabase pendiente
-  const _2FA_MINUTOS = 10;
+  /* ── Estado TOTP ─────────────────────────────────────────────── */
+  let _2fa_sesion  = null;   // sesión Supabase pendiente de verificar 2FA
+  let _2fa_email   = null;   // email del login en curso
+  let _totp_secret = null;   // secreto TOTP en memoria durante setup
 
-  function _2fa_generar() {
-    return String(Math.floor(100000 + Math.random() * 900000));
+  /* Consulta Supabase con el token de sesión pendiente */
+  async function _sbPedAuth(path, opts) {
+    const r = await fetch(SB_URL + '/rest/v1/' + path, Object.assign({
+      headers: {
+        'apikey': SB_KEY,
+        'Authorization': 'Bearer ' + _2fa_sesion.access_token,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      }
+    }, opts));
+    if (!r.ok) { const t = await r.text(); throw new Error(t); }
+    const txt = await r.text();
+    return txt ? JSON.parse(txt) : null;
   }
 
-  function _2fa_enviar(email, codigo) {
+  /* Post-login: ¿tiene TOTP configurado? */
+  async function _totpPostLogin(email, sesion) {
     try {
-      fetch(REGISTRO_URL, {
-        method: 'POST',
-        mode: 'no-cors',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'email',
-          tipo: 'codigo_2fa',
-          destinatario: email,
-          codigo: codigo,
-          minutos: _2FA_MINUTOS
-        })
-      });
-    } catch(e) { /* silencioso */ }
+      const rows = await _sbPedAuth('totp_secrets?email=eq.' + encodeURIComponent(email) + '&select=secret,verificado');
+      if (rows && rows.length > 0 && rows[0].verificado) {
+        /* Tiene TOTP → pedir código */
+        const errEl = document.getElementById('totp-verify-err');
+        const inp   = document.getElementById('totp-verify-code');
+        if (errEl) errEl.textContent = '';
+        if (inp)   inp.value = '';
+        const emailEl = document.getElementById('totp-verify-email');
+        if (emailEl) emailEl.textContent = email;
+        _sekShowPanel('pnl-totp-verify');
+      } else {
+        /* No tiene TOTP → iniciar setup */
+        await _totpIniciarSetup(email);
+      }
+    } catch(e) {
+      /* Error consultando → permitir entrada sin TOTP para no bloquear */
+      _saveSession(sesion);
+      _enterApp();
+    }
   }
+
+  /* Generar secreto Base32 aleatorio */
+  function _totpGenSecret() {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+    let s = '';
+    const arr = new Uint8Array(20);
+    crypto.getRandomValues(arr);
+    arr.forEach(b => { s += chars[b % 32]; });
+    return s;
+  }
+
+  /* TOTP: generar código de 6 dígitos a partir del secreto y el tiempo */
+  async function _totpGenCodigo(secret) {
+    const base32Decode = s => {
+      const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+      s = s.toUpperCase().replace(/=+$/, '');
+      let bits = '', bytes = [];
+      for (const c of s) { const v = alphabet.indexOf(c); if (v < 0) continue; bits += v.toString(2).padStart(5, '0'); }
+      for (let i = 0; i + 8 <= bits.length; i += 8) bytes.push(parseInt(bits.slice(i, i+8), 2));
+      return new Uint8Array(bytes);
+    };
+    const counter = Math.floor(Date.now() / 1000 / 30);
+    const counterBuf = new ArrayBuffer(8);
+    new DataView(counterBuf).setUint32(4, counter, false);
+    const keyBytes = base32Decode(secret);
+    const key = await crypto.subtle.importKey('raw', keyBytes, {name:'HMAC', hash:'SHA-1'}, false, ['sign']);
+    const sig  = await crypto.subtle.sign('HMAC', key, counterBuf);
+    const arr  = new Uint8Array(sig);
+    const offset = arr[19] & 0xf;
+    const code = ((arr[offset] & 0x7f) << 24 | arr[offset+1] << 16 | arr[offset+2] << 8 | arr[offset+3]) % 1000000;
+    return String(code).padStart(6, '0');
+  }
+
+  /* Verificar código TOTP (acepta ventana actual y la anterior por clock drift) */
+  async function _totpVerificar(secret, codigo) {
+    const base32Decode = s => {
+      const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+      s = s.toUpperCase().replace(/=+$/, '');
+      let bits = '', bytes = [];
+      for (const c of s) { const v = alphabet.indexOf(c); if (v < 0) continue; bits += v.toString(2).padStart(5, '0'); }
+      for (let i = 0; i + 8 <= bits.length; i += 8) bytes.push(parseInt(bits.slice(i, i+8), 2));
+      return new Uint8Array(bytes);
+    };
+    const check = async (offset) => {
+      const counter = Math.floor(Date.now() / 1000 / 30) + offset;
+      const counterBuf = new ArrayBuffer(8);
+      new DataView(counterBuf).setUint32(4, counter, false);
+      const keyBytes = base32Decode(secret);
+      const key = await crypto.subtle.importKey('raw', keyBytes, {name:'HMAC', hash:'SHA-1'}, false, ['sign']);
+      const sig  = await crypto.subtle.sign('HMAC', key, counterBuf);
+      const arr  = new Uint8Array(sig);
+      const off  = arr[19] & 0xf;
+      const code = ((arr[off] & 0x7f) << 24 | arr[off+1] << 16 | arr[off+2] << 8 | arr[off+3]) % 1000000;
+      return String(code).padStart(6, '0') === String(codigo).padStart(6, '0');
+    };
+    return (await check(0)) || (await check(-1)) || (await check(1));
+  }
+
+  /* Iniciar setup TOTP: generar secreto, mostrar QR */
+  async function _totpIniciarSetup(email) {
+    _totp_secret = _totpGenSecret();
+    const issuer  = 'Sekunet';
+    const label   = encodeURIComponent(issuer + ':' + email);
+    const otpauth = 'otpauth://totp/' + label + '?secret=' + _totp_secret + '&issuer=' + issuer + '&algorithm=SHA1&digits=6&period=30';
+    const qrUrl   = 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=' + encodeURIComponent(otpauth);
+
+    const qrEl = document.getElementById('totp-setup-qr');
+    if (qrEl) qrEl.src = qrUrl;
+    const secEl = document.getElementById('totp-setup-secret');
+    if (secEl) secEl.textContent = _totp_secret;
+    const emailEl = document.getElementById('totp-setup-email');
+    if (emailEl) emailEl.textContent = email;
+    const errEl = document.getElementById('totp-setup-err');
+    if (errEl) errEl.textContent = '';
+    const inp = document.getElementById('totp-setup-code');
+    if (inp) inp.value = '';
+
+    _sekShowPanel('pnl-totp-setup');
+  }
+
+  /* Confirmar setup TOTP */
+  window._totpConfirmarSetup = async function() {
+    const code  = (document.getElementById('totp-setup-code')?.value || '').trim();
+    const errEl = document.getElementById('totp-setup-err');
+    const btn   = document.getElementById('totp-setup-btn');
+
+    errEl.textContent = '';
+    if (!code || code.length !== 6 || !/^\d+$/.test(code)) {
+      errEl.textContent = 'Ingresá los 6 dígitos de la app.'; return;
+    }
+    const ok = await _totpVerificar(_totp_secret, code);
+    if (!ok) { errEl.textContent = 'Código incorrecto. Verificá la hora del dispositivo.'; return; }
+
+    btn.disabled = true;
+    try {
+      /* Guardar secreto en Supabase */
+      await _sbPedAuth('totp_secrets', {
+        method: 'POST',
+        headers: { 'Prefer': 'return=minimal' },
+        body: JSON.stringify({ email: _2fa_email, secret: _totp_secret, verificado: true })
+      });
+      _saveSession(_2fa_sesion);
+      _2fa_sesion = null; _2fa_email = null; _totp_secret = null;
+      _enterApp();
+    } catch(e) {
+      errEl.textContent = 'Error guardando: ' + e.message;
+      btn.disabled = false;
+    }
+  };
+
+  /* Verificar código TOTP en login */
+  window._totpVerificarLogin = async function() {
+    const code  = (document.getElementById('totp-verify-code')?.value || '').trim();
+    const errEl = document.getElementById('totp-verify-err');
+    const btn   = document.getElementById('totp-verify-btn');
+
+    errEl.textContent = '';
+    if (!code || code.length !== 6 || !/^\d+$/.test(code)) {
+      errEl.textContent = 'Ingresá los 6 dígitos de la app.'; return;
+    }
+
+    btn.disabled = true;
+    try {
+      const rows = await _sbPedAuth('totp_secrets?email=eq.' + encodeURIComponent(_2fa_email) + '&select=secret');
+      if (!rows || !rows.length) throw new Error('Sin secreto registrado.');
+      const ok = await _totpVerificar(rows[0].secret, code);
+      if (!ok) { errEl.textContent = 'Código incorrecto o expirado.'; btn.disabled = false; return; }
+      _saveSession(_2fa_sesion);
+      _2fa_sesion = null; _2fa_email = null;
+      _enterApp();
+    } catch(e) {
+      errEl.textContent = 'Error: ' + e.message;
+      btn.disabled = false;
+    }
+  };
 
   window._sekLogin = async function () {
     const email = (document.getElementById('lf-email')?.value || '').trim().toLowerCase();
@@ -2273,27 +2472,7 @@ function generarPDF() {
       return;
     }
 
-    /* ── Flujo 2FA post-login ─────────────────────────────────── */
-    if (_2fa_sesion) {
-      if (Date.now() > _2fa_expira) {
-        _2fa_codigo = null; _2fa_expira = null; _2fa_sesion = null;
-        errEl.textContent = 'El código expiró. Iniciá sesión de nuevo.';
-        setTimeout(() => _sekShowPanel('pnl-login'), 2000);
-        return;
-      }
-      if (code !== _2fa_codigo) {
-        errEl.textContent = 'Código incorrecto. Revisá tu correo.';
-        return;
-      }
-      /* Código válido — entrar */
-      const sesion = _2fa_sesion;
-      _2fa_codigo = null; _2fa_expira = null; _2fa_sesion = null;
-      _saveSession(sesion);
-      _enterApp();
-      return;
-    }
-
-    /* ── Flujo original Supabase (verificación de email) ─────── */
+    /* ── Flujo original Supabase (verificación de email registro) ─ */
     btn.disabled = true; spin.style.display = 'block';
     try {
       const data = await _auth('/verify', { email: _pendEmail, token: code, type: _verifyType });
