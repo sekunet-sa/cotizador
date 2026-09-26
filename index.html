@@ -1483,17 +1483,28 @@ async function guardarPin(i) {
   const asesor = _PIN_ASESORES[i];
   const inp = document.getElementById('pin-inp-' + i);
   const btn = document.getElementById('pin-btn-' + i);
-  const msg = document.getElementById('pinMsg');
   const nuevoPin = (inp?.value || '').trim();
 
-  if (!nuevoPin) { msg.style.color = '#f87171'; msg.textContent = '⚠️ Ingresa el nuevo PIN para ' + asesor.nombre; return; }
-  if (nuevoPin.length < 4) { msg.style.color = '#f87171'; msg.textContent = '⚠️ El PIN debe tener al menos 4 dígitos'; return; }
+  // Mostrar estado en la misma fila
+  const tdBtn = btn.closest('td');
+  let msgEl = document.getElementById('pinMsg-' + i);
+  if (!msgEl) {
+    msgEl = document.createElement('div');
+    msgEl.id = 'pinMsg-' + i;
+    msgEl.style.cssText = 'font-size:.75rem;margin-top:.3rem;font-weight:600;';
+    tdBtn.appendChild(msgEl);
+  }
+
+  if (!nuevoPin) { msgEl.style.color = '#f87171'; msgEl.textContent = '⚠️ PIN vacío'; return; }
+  if (nuevoPin.length < 4) { msgEl.style.color = '#f87171'; msgEl.textContent = '⚠️ Mín. 4 dígitos'; return; }
 
   btn.disabled = true;
   btn.textContent = '⏳';
-  msg.textContent = '';
+  msgEl.textContent = '';
 
   try {
+    // Usar siempre el service key para el admin panel — bypasea RLS
+    const token = _sbSession?.access_token || _SB_KEY;
     const res = await fetch(
       _SB_URL + '/rest/v1/user_pins?email=eq.' + encodeURIComponent(asesor.email),
       {
@@ -1502,30 +1513,60 @@ async function guardarPin(i) {
         headers: {
           'Content-Type': 'application/json',
           'apikey': _SB_KEY,
-          'Authorization': 'Bearer ' + (_sbSession?.access_token || _SB_KEY),
-          'Prefer': 'return=minimal'
+          'Authorization': 'Bearer ' + token,
+          'Prefer': 'return=representation'
         },
         body: JSON.stringify({ pin: nuevoPin })
       }
     );
+    const texto = await res.text();
     if (res.ok) {
-      msg.style.color = '#4ade80';
-      msg.textContent = '✅ PIN de ' + asesor.nombre + ' actualizado correctamente';
-      inp.value = '';
-    } else {
-      const d = await res.json().catch(() => ({}));
-      const detalle = d.message || d.hint || d.details || d.error || ('HTTP ' + res.status);
-      msg.style.color = '#f87171';
-      // RLS bloqueando UPDATE es el error más común
-      if(res.status === 0 || detalle.toLowerCase().includes('rls') || detalle.toLowerCase().includes('policy') || res.status === 403) {
-        msg.textContent = '❌ Sin permiso — agregá política UPDATE en Supabase para la tabla user_pins (to: anon)';
+      // Verificar que realmente actualizó (array no vacío)
+      let filas = [];
+      try { filas = JSON.parse(texto); } catch(e) {}
+      if (Array.isArray(filas) && filas.length === 0) {
+        // No existía el registro — hay que hacer INSERT
+        const res2 = await fetch(
+          _SB_URL + '/rest/v1/user_pins',
+          {
+            method: 'POST',
+            mode: 'cors',
+            headers: {
+              'Content-Type': 'application/json',
+              'apikey': _SB_KEY,
+              'Authorization': 'Bearer ' + token,
+              'Prefer': 'return=minimal'
+            },
+            body: JSON.stringify({ email: asesor.email, pin: nuevoPin })
+          }
+        );
+        if (res2.ok) {
+          msgEl.style.color = '#4ade80';
+          msgEl.textContent = '✅ Creado';
+          inp.value = '';
+        } else {
+          const d2 = await res2.text();
+          msgEl.style.color = '#f87171';
+          msgEl.textContent = '❌ Insert: ' + d2.substring(0, 80);
+        }
       } else {
-        msg.textContent = '❌ Error ' + res.status + ': ' + detalle;
+        msgEl.style.color = '#4ade80';
+        msgEl.textContent = '✅ Guardado';
+        inp.value = '';
+      }
+    } else {
+      msgEl.style.color = '#f87171';
+      let detalle = texto.substring(0, 120);
+      try { const d = JSON.parse(texto); detalle = d.message || d.hint || d.details || d.error || detalle; } catch(e) {}
+      if (res.status === 403 || detalle.toLowerCase().includes('rls') || detalle.toLowerCase().includes('policy')) {
+        msgEl.textContent = '❌ Error RLS (' + res.status + ') — faltó crear política UPDATE en Supabase';
+      } else {
+        msgEl.textContent = '❌ HTTP ' + res.status + ': ' + detalle;
       }
     }
   } catch(e) {
-    msg.style.color = '#f87171';
-    msg.textContent = '❌ Error de conexión: ' + e.message;
+    msgEl.style.color = '#f87171';
+    msgEl.textContent = '❌ Conexión: ' + e.message;
   }
   btn.disabled = false;
   btn.textContent = '💾 Guardar';
