@@ -2146,7 +2146,7 @@ function generarPDF() {
 
   /* ── Cambiar panel ───────────────────────────────────────────── */
   window._sekShowPanel = function (id) {
-    ['pnl-login', 'pnl-register', 'pnl-verify', 'pnl-forgot'].forEach(p => {
+    ['pnl-login', 'pnl-register', 'pnl-verify', 'pnl-forgot', 'pnl-totp-setup', 'pnl-totp-verify'].forEach(p => {
       const el = document.getElementById(p);
       if (el) el.style.display = (p === id) ? '' : 'none';
     });
@@ -2199,23 +2199,10 @@ function generarPDF() {
     try {
       const data = await _auth('/token?grant_type=password', { email, password: pass });
 
-      /* Credenciales válidas → generar código 2FA */
-      const codigo = _2fa_generar();
-      _2fa_codigo  = codigo;
-      _2fa_expira  = Date.now() + _2FA_MINUTOS * 60 * 1000;
-      _2fa_sesion  = data;
-
-      _2fa_enviar(email, codigo);
-
-      /* Mostrar panel de verificación 2FA */
-      const showEl = document.getElementById('vf-email-show');
-      if (showEl) showEl.textContent = email;
-      const vfErr = document.getElementById('vf-err');
-      if (vfErr) vfErr.textContent = '';
-      const vfCode = document.getElementById('vf-code');
-      if (vfCode) { vfCode.value = ''; }
-      _sekShowPanel('pnl-verificar');
-      setTimeout(() => { if (vfCode) vfCode.focus(); }, 200);
+      /* Credenciales válidas → verificar si tiene TOTP configurado */
+      _2fa_sesion = data;
+      _2fa_email  = email;
+      await _totpPostLogin(email, data);
 
     } catch (e) {
       const msg = e.message.toLowerCase();
