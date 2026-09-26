@@ -1511,66 +1511,31 @@ async function guardarPin(i) {
   msgEl.textContent = '';
 
   try {
-    // Usar siempre el service key para el admin panel — bypasea RLS
-    const token = _sbSession?.access_token || _SB_KEY;
+    // Service role bypasea RLS — upsert directo
     const res = await fetch(
-      _SB_URL + '/rest/v1/user_pins?email=eq.' + encodeURIComponent(asesor.email),
+      _SB_URL + '/rest/v1/user_pins',
       {
-        method: 'PATCH',
+        method: 'POST',
         mode: 'cors',
         headers: {
           'Content-Type': 'application/json',
-          'apikey': _SB_KEY,
-          'Authorization': 'Bearer ' + token,
-          'Prefer': 'return=representation'
+          'apikey': _SB_SVC,
+          'Authorization': 'Bearer ' + _SB_SVC,
+          'Prefer': 'resolution=merge-duplicates,return=minimal'
         },
-        body: JSON.stringify({ pin: nuevoPin })
+        body: JSON.stringify({ email: asesor.email, pin: nuevoPin })
       }
     );
-    const texto = await res.text();
     if (res.ok) {
-      // Verificar que realmente actualizó (array no vacío)
-      let filas = [];
-      try { filas = JSON.parse(texto); } catch(e) {}
-      if (Array.isArray(filas) && filas.length === 0) {
-        // No existía el registro — hay que hacer INSERT
-        const res2 = await fetch(
-          _SB_URL + '/rest/v1/user_pins',
-          {
-            method: 'POST',
-            mode: 'cors',
-            headers: {
-              'Content-Type': 'application/json',
-              'apikey': _SB_KEY,
-              'Authorization': 'Bearer ' + token,
-              'Prefer': 'return=minimal'
-            },
-            body: JSON.stringify({ email: asesor.email, pin: nuevoPin })
-          }
-        );
-        if (res2.ok) {
-          msgEl.style.color = '#4ade80';
-          msgEl.textContent = '✅ Creado';
-          inp.value = '';
-        } else {
-          const d2 = await res2.text();
-          msgEl.style.color = '#f87171';
-          msgEl.textContent = '❌ Insert: ' + d2.substring(0, 80);
-        }
-      } else {
-        msgEl.style.color = '#4ade80';
-        msgEl.textContent = '✅ Guardado';
-        inp.value = '';
-      }
+      msgEl.style.color = '#4ade80';
+      msgEl.textContent = '✅ Guardado';
+      inp.value = '';
     } else {
+      const texto = await res.text();
       msgEl.style.color = '#f87171';
       let detalle = texto.substring(0, 120);
       try { const d = JSON.parse(texto); detalle = d.message || d.hint || d.details || d.error || detalle; } catch(e) {}
-      if (res.status === 403 || detalle.toLowerCase().includes('rls') || detalle.toLowerCase().includes('policy')) {
-        msgEl.textContent = '❌ Error RLS (' + res.status + ') — faltó crear política UPDATE en Supabase';
-      } else {
-        msgEl.textContent = '❌ HTTP ' + res.status + ': ' + detalle;
-      }
+      msgEl.textContent = '❌ HTTP ' + res.status + ': ' + detalle;
     }
   } catch(e) {
     msgEl.style.color = '#f87171';
@@ -2132,6 +2097,8 @@ function registrarExportacion(tipoExport) {
 ═══════════════════════════════════════════════ */
 const _SB_URL = 'https://loldcmqaklfpmvnxkxbu.supabase.co';
 const _SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxvbGRjbXFha2xmcG12bnhreGJ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU2MTgyMTksImV4cCI6MjEwMTE5NDIxOX0.RI6FcpDz_Z4WBPvmsT0Jx76OVCzqXFZ6sR0LoKUokKo';
+// Service role — solo para escritura de PINs desde el admin panel (bypasea RLS)
+const _SB_SVC = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxvbGRjbXFha2xmcG12bnhreGJ1Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4NTYxODIxOSwiZXhwIjoyMTAxMTk0MjE5fQ.noE4c0aSXjhD_ER6ILi7KowcnNPtc8LTRCUu_G5OWv0';
 let _sbSession = null;
 
 function sbMostrarVista(vista) {
