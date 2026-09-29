@@ -3129,8 +3129,8 @@ function dmAcBuscar(q) {
   q = (q||'').trim().toUpperCase();
   if(q.length < 1) { list.classList.remove('open'); list.innerHTML=''; _dmAcIdx=-1; return; }
   // Buscar en el catálogo global de productos — con ranking por relevancia
-  var prods = (typeof PRODUCTS !== 'undefined' ? PRODUCTS : []);
-  // También buscar en cualquier array global que tenga modelos (sku, codigo, etc.)
+  // El catálogo del cotizador vive en PRODUCTS_BASE
+  var prods = (typeof PRODUCTS_BASE !== 'undefined' ? PRODUCTS_BASE : (typeof PRODUCTS !== 'undefined' ? PRODUCTS : []));
   var allItems = prods;
   var tier1 = []; // modelo empieza con el término
   var tier2 = []; // modelo contiene el término (no al inicio)
@@ -3138,10 +3138,10 @@ function dmAcBuscar(q) {
   for(var i=0;i<allItems.length;i++){
     var p = allItems[i];
     if(!p) continue;
-    // Soportar diferentes estructuras: model/sku/code/name/nombre
-    var modelo = (p.model||p.sku||p.code||p.name||p.nombre||'').toUpperCase();
+    // El catálogo usa campo "n" para el nombre/modelo del producto
+    var modelo = (p.n||p.model||p.sku||p.code||p.name||p.nombre||'').toUpperCase();
     if(!modelo) continue;
-    var desc = (p.desc||p.description||p.descripcion||p.cat||p.category||p.sub||'').toUpperCase();
+    var desc = (p.cat||p.sub||p.marca||p.desc||p.description||'').toUpperCase();
     var idxM = modelo.indexOf(q);
     if(idxM === 0) { tier1.push(p); }
     else if(idxM > 0) { tier2.push(p); }
@@ -3157,10 +3157,10 @@ function dmAcBuscar(q) {
   _dmAcIdx = -1;
   var qOrig = q; // para resaltar
   list.innerHTML = matches.map(function(p,i){
-    var modelo = p.model||p.sku||p.code||p.name||p.nombre||'';
+    var modelo = p.n||p.model||p.sku||p.code||p.name||p.nombre||'';
     var precio = dmPrecioMaritimo(p);
     var precioStr = precio > 0 ? '<span class="dm-ac-price">$'+precio.toFixed(2)+'</span>' : '';
-    var catStr = (p.cat||p.category||p.sub||p.description||p.descripcion||'');
+    var catStr = (p.cat||p.sub||p.marca||p.description||'');
     // Resaltar el término buscado en el modelo
     var modeloHtml = _dmEsc(modelo).replace(new RegExp('('+_dmEscReg(qOrig)+')','gi'),'<mark style="background:var(--accent);color:#fff;border-radius:2px;padding:0 2px;">$1</mark>');
     return '<div class="dm-ac-item" data-idx="'+i+'" data-model="'+_dmEsc(modelo)+'" data-precio="'+precio+'" onclick="dmAcSeleccionar(this)">'+
@@ -3175,16 +3175,11 @@ function dmAcBuscar(q) {
 }
 
 function dmPrecioMaritimo(p) {
-  // Intentar obtener precio base China marítimo del producto del catálogo
-  // Los precios en el cotizador vienen de p.price (precio lista Hikvision USD)
-  // Marítimo = precio lista × factor marítimo (sin margen de venta)
-  // El cotizador usa: precioVenta = price * (1 + margin) * routeFactor * (1 + arancel)
-  // Para referencia de pérdida usamos precio lista sin margen como base
+  // El catálogo usa p.fob (precio FOB China) y p.exw (precio EXW fábrica)
+  // Para referencia de demanda perdida usamos FOB como precio marítimo China base
   if(!p) return 0;
-  var base = p.price || p.lista || 0;
+  var base = p.fob || p.exw || p.price || p.lista || 0;
   if(!base) return 0;
-  // Factor marítimo China es el más bajo — usar el precio lista directo como referencia
-  // ya que es lo que Sekunet paga en FOB China antes de márgenes
   return Math.round(base * 100) / 100;
 }
 
