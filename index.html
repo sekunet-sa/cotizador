@@ -431,6 +431,7 @@ textarea{resize:vertical;min-height:56px;font-size:.82rem;}
   <div style="display:flex;gap:4px;background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:3px;">
     <button id="modTab-cotizador" onclick="setModulo('cotizador')" style="background: var(--surface); border-width: medium; border-style: none; border-color: currentcolor; border-image: none; border-radius: 7px; padding: 0.3rem 0.85rem; font-family: inherit; font-size: 0.78rem; font-weight: 600; cursor: pointer; color: var(--text); transition: 0.2s; box-shadow: rgba(0, 0, 0, 0.15) 0px 1px 4px;">📊 Cotizador</button>
     <button id="modTab-pedidos" onclick="setModulo('pedidos')" style="background: none; border-width: medium; border-style: none; border-color: currentcolor; border-image: none; border-radius: 7px; padding: 0.3rem 0.85rem; font-family: inherit; font-size: 0.78rem; font-weight: 600; cursor: pointer; color: var(--muted); transition: 0.2s; box-shadow: none;">🛒 Pedidos</button>
+    <button id="modTab-demanda" onclick="setModulo('demanda')" style="background: none; border-width: medium; border-style: none; border-color: currentcolor; border-image: none; border-radius: 7px; padding: 0.3rem 0.85rem; font-family: inherit; font-size: 0.78rem; font-weight: 600; cursor: pointer; color: var(--muted); transition: 0.2s; box-shadow: none;">📉 Demanda</button>
   </div>
   <div class="hdr-right">
     <button class="theme-toggle" onclick="toggleTheme()" id="themeBtn" title="Cambiar tema">🌙</button>
@@ -709,6 +710,199 @@ textarea{resize:vertical;min-height:56px;font-size:.82rem;}
   <div id="ped-lista"><div class="ped-card"><div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:.5rem;margin-bottom:.6rem;"><div><div style="font-size:.92rem;font-weight:700;">SITEC <span style="color:var(--muted);font-weight:400;font-size:.8rem;">— HCP - ACS y Alarma</span></div><div style="font-size:.72rem;color:var(--muted);margin-top:2px;">👤 Roberto &nbsp;·&nbsp; 📅 25/09/2026 11:46 a. m.</div></div><span class="ped-estado est-pendiente">🟡 Pendiente</span></div><div class="ped-prog"><div class="ped-step done">🟡 Pendiente</div><div class="ped-step admin-btn" onclick="avanzarEstado(2,'Recibido')" title="Marcar como Recibido">🔵 Recibido</div><div class="ped-step">⚙️ En proceso</div><div class="ped-step">🚚 En tránsito</div><div class="ped-step">📦 Entregado</div><div class="ped-step">✅ Facturado</div></div><div style="margin:.5rem 0;max-height:120px;overflow-y:auto;"><div style="font-size:.76rem;padding:.2rem 0;border-bottom:1px solid var(--border);font-family:'DM Mono',monospace;">HikCentral-P-ACS-1Door x2 (🔑 Licencia)</div><div style="font-size:.76rem;padding:.2rem 0;border-bottom:1px solid var(--border);font-family:'DM Mono',monospace;">HikCentral-P-AlarmPanel-1Unit x2 (🔑 Licencia)</div><div style="font-size:.76rem;padding:.2rem 0;border-bottom:1px solid var(--border);font-family:'DM Mono',monospace;">HikCentral-P-OutdoorStation-1Unit x1 (🔑 Licencia)</div></div><div style="display:flex;gap:.5rem;margin-top:.5rem;flex-wrap:wrap;"><span style="font-size:.71rem;background:rgba(167,139,250,.1);color:#a78bfa;padding:.22rem .6rem;border-radius:6px;">📄 Cot: PY2026-0134_HCP___ACS_y_Alarma.pdf</span></div><div style="font-size:.75rem;color:var(--muted);margin-top:.4rem;font-style:italic;">📝 Urgente</div><div style="margin-top:.75rem;"><div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;margin-bottom:.6rem;"><span style="font-size:.72rem;color:var(--muted);font-weight:600;">Mover estado:</span><button onclick="cambiarEstado(2,'Recibido')" style="background: var(--surface2); border-color: var(--border); border-top-style: ; border-top-width: ; border-right-style: ; border-right-width: ; border-bottom-style: ; border-bottom-width: ; border-left-style: ; border-left-width: ; border-image-source: ; border-image-slice: ; border-image-width: ; border-image-outset: ; border-image-repeat: ; color: var(--muted); padding: 0.2rem 0.55rem; border-radius: 6px; cursor: pointer; font-family: inherit; font-size: 0.7rem;" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">🔵 Recibido</button><button onclick="cambiarEstado(2,'En proceso')" style="background: var(--surface2); border-color: var(--border); border-top-style: ; border-top-width: ; border-right-style: ; border-right-width: ; border-bottom-style: ; border-bottom-width: ; border-left-style: ; border-left-width: ; border-image-source: ; border-image-slice: ; border-image-width: ; border-image-outset: ; border-image-repeat: ; color: var(--muted); padding: 0.2rem 0.55rem; border-radius: 6px; cursor: pointer; font-family: inherit; font-size: 0.7rem;" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">⚙️ En proceso</button><button onclick="cambiarEstado(2,'En tránsito')" style="background: var(--surface2); border-color: var(--border); border-top-style: ; border-top-width: ; border-right-style: ; border-right-width: ; border-bottom-style: ; border-bottom-width: ; border-left-style: ; border-left-width: ; border-image-source: ; border-image-slice: ; border-image-width: ; border-image-outset: ; border-image-repeat: ; color: var(--muted); padding: 0.2rem 0.55rem; border-radius: 6px; cursor: pointer; font-family: inherit; font-size: 0.7rem;" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">🚚 En tránsito</button><button onclick="cambiarEstado(2,'Entregado')" style="background: var(--surface2); border-color: var(--border); border-top-style: ; border-top-width: ; border-right-style: ; border-right-width: ; border-bottom-style: ; border-bottom-width: ; border-left-style: ; border-left-width: ; border-image-source: ; border-image-slice: ; border-image-width: ; border-image-outset: ; border-image-repeat: ; color: var(--muted); padding: 0.2rem 0.55rem; border-radius: 6px; cursor: pointer; font-family: inherit; font-size: 0.7rem;" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">📦 Entregado</button><button onclick="cambiarEstado(2,'Facturado')" style="background: var(--surface2); border-color: var(--border); border-top-style: ; border-top-width: ; border-right-style: ; border-right-width: ; border-bottom-style: ; border-bottom-width: ; border-left-style: ; border-left-width: ; border-image-source: ; border-image-slice: ; border-image-width: ; border-image-outset: ; border-image-repeat: ; color: var(--muted); padding: 0.2rem 0.55rem; border-radius: 6px; cursor: pointer; font-family: inherit; font-size: 0.7rem;" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">✅ Facturado</button></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;padding:.7rem;background:var(--surface2);border-radius:8px;border:1px solid var(--border);"><div><div style="font-size:.65rem;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.07em;margin-bottom:.25rem;">📋 # Solicitud Sekunet</div><div style="display:flex;gap:5px;"><input type="text" id="num-sol-2" value="" placeholder="SEK-2026-001" style="flex:1;padding:.32rem .55rem;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-family:inherit;font-size:.78rem;"><button onclick="guardarRefs(2)" style="background:var(--accent);color:#fff;border:none;padding:.32rem .6rem;border-radius:6px;cursor:pointer;font-size:.72rem;font-weight:600;">✓</button></div></div><div><div style="font-size:.65rem;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.07em;margin-bottom:.25rem;">🏷️ PI Hikvision</div><div style="display:flex;gap:5px;"><input type="text" id="pi-hik-2" value="" placeholder="PI-2026-12345" style="flex:1;padding:.32rem .55rem;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-family:inherit;font-size:.78rem;"><button onclick="guardarRefs(2)" style="background:var(--accent);color:#fff;border:none;padding:.32rem .6rem;border-radius:6px;cursor:pointer;font-size:.72rem;font-weight:600;">✓</button></div></div></div></div></div></div>
 </div>
 <!-- /modPedidos -->
+
+<!-- ══ MÓDULO DEMANDA ══════════════════════════════════ -->
+<div id="modDemanda" style="padding:1.4rem 1.6rem;display:none;">
+
+  <style>
+  /* ── DEMANDA MODULE STYLES ── */
+  .dm-toolbar{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.7rem;margin-bottom:1.2rem;}
+  .dm-title{font-size:1rem;font-weight:700;}
+  .dm-sub{font-size:.74rem;color:var(--muted);}
+  .dm-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1.1rem 1.3rem;margin-bottom:1rem;}
+  .dm-form-grid{display:grid;grid-template-columns:2.5fr 1fr 1fr 1fr auto;gap:.7rem;align-items:end;}
+  .dm-form-grid .dm-field label{font-size:.65rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:.3rem;}
+  .dm-btn-reg{background:linear-gradient(135deg,var(--accent),#ff5c4e);color:#fff;border:none;padding:.55rem 1.4rem;border-radius:8px;cursor:pointer;font-family:inherit;font-size:.88rem;font-weight:700;white-space:nowrap;transition:.2s;height:2.5rem;}
+  .dm-btn-reg:hover{opacity:.9;}
+  .dm-btn-reg:active{transform:scale(.97);}
+  /* Autocomplete dropdown */
+  .dm-autocomplete{position:relative;}
+  .dm-autocomplete-list{position:absolute;top:100%;left:0;right:0;background:var(--surface);border:1px solid var(--accent);border-radius:8px;max-height:220px;overflow-y:auto;z-index:500;box-shadow:0 6px 20px var(--shadow);display:none;}
+  .dm-autocomplete-list.open{display:block;}
+  .dm-ac-item{padding:.45rem .75rem;cursor:pointer;border-bottom:1px solid var(--border);transition:background .12s;}
+  .dm-ac-item:last-child{border-bottom:none;}
+  .dm-ac-item:hover,.dm-ac-item.selected{background:var(--surface2);}
+  .dm-ac-model{font-size:.8rem;font-weight:600;}
+  .dm-ac-meta{font-size:.67rem;color:var(--muted);}
+  .dm-ac-price{font-size:.7rem;color:var(--success);font-family:'DM Mono',monospace;}
+  /* Tienda quick-btns */
+  .dm-tienda-btns{display:flex;gap:.4rem;}
+  .dm-t-btn{flex:1;background:var(--surface2);border:2px solid var(--border);color:var(--text);padding:.45rem .3rem;border-radius:8px;cursor:pointer;font-family:inherit;font-size:.72rem;font-weight:600;text-align:center;transition:.15s;white-space:nowrap;}
+  .dm-t-btn:hover{border-color:var(--blue);}
+  .dm-t-btn.active{border-color:var(--blue);background:rgba(79,142,247,.12);color:var(--blue);}
+  /* Precio readonly */
+  input.dm-precio-ro{background:rgba(22,163,74,.06)!important;border-color:rgba(22,163,74,.3)!important;color:var(--success)!important;font-weight:700;font-family:'DM Mono',monospace;}
+  .dm-stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:.8rem;margin-bottom:1rem;}
+  .dm-stat{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:.8rem 1rem;text-align:center;}
+  .dm-stat-val{font-size:1.4rem;font-weight:800;font-family:'DM Mono',monospace;}
+  .dm-stat-lbl{font-size:.65rem;color:var(--muted);text-transform:uppercase;letter-spacing:.09em;margin-top:2px;}
+  .dm-filters{display:flex;gap:.6rem;flex-wrap:wrap;margin-bottom:1rem;align-items:center;}
+  .dm-filters select,.dm-filters input{flex:1;min-width:130px;max-width:220px;background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:.42rem .7rem;border-radius:8px;font-family:inherit;font-size:.82rem;}
+  .dm-tbl-wrap{overflow-x:auto;}
+  .dm-tbl{width:100%;border-collapse:collapse;font-size:.8rem;}
+  .dm-tbl th{background:var(--surface2);color:var(--muted);font-size:.65rem;font-weight:700;letter-spacing:.09em;text-transform:uppercase;padding:.55rem .75rem;text-align:left;border-bottom:1px solid var(--border);position:sticky;top:0;z-index:1;}
+  .dm-tbl td{padding:.5rem .75rem;border-bottom:1px solid var(--border);vertical-align:middle;}
+  .dm-tbl tr:hover td{background:var(--surface2);}
+  .dm-tbl tr:last-child td{border-bottom:none;}
+  .dm-badge-tienda{background:rgba(79,142,247,.1);color:var(--blue);border:1px solid rgba(79,142,247,.2);border-radius:5px;font-size:.65rem;font-weight:700;padding:2px 7px;}
+  .dm-btn-del{background:none;border:none;color:var(--muted);cursor:pointer;font-size:.9rem;padding:2px 6px;border-radius:5px;transition:.15s;}
+  .dm-btn-del:hover{background:rgba(230,60,47,.12);color:var(--accent);}
+  .dm-top-list{display:grid;grid-template-columns:1fr 1fr;gap:.8rem;}
+  .dm-top-item{display:flex;align-items:center;justify-content:space-between;padding:.45rem .7rem;background:var(--surface2);border-radius:8px;border:1px solid var(--border);}
+  .dm-top-item .dm-top-rank{font-size:.7rem;font-weight:700;color:var(--muted);width:18px;}
+  .dm-top-item .dm-top-name{font-size:.78rem;font-weight:600;flex:1;margin:0 .5rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .dm-top-item .dm-top-cnt{font-size:.72rem;font-weight:700;color:var(--accent);white-space:nowrap;}
+  .dm-empty{text-align:center;color:var(--muted);padding:2.5rem;font-size:.85rem;}
+  .dm-section-title{font-size:.72rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:.7rem;}
+  .dm-top-bar-wrap{height:10px;background:var(--surface2);border-radius:5px;flex:1;margin:0 .5rem;overflow:hidden;}
+  .dm-top-bar{height:100%;background:linear-gradient(90deg,var(--accent),#ff7043);border-radius:5px;transition:width .5s;}
+  .dm-top-item2{display:flex;align-items:center;padding:.4rem .7rem;background:var(--surface2);border-radius:8px;border:1px solid var(--border);margin-bottom:.4rem;}
+  @media(max-width:900px){.dm-form-grid{grid-template-columns:1fr 1fr}.dm-stats-row{grid-template-columns:1fr 1fr}.dm-top-list{grid-template-columns:1fr}}
+  </style>
+
+  <!-- Toolbar -->
+  <div class="dm-toolbar">
+    <div>
+      <div class="dm-title">📉 Demanda No Atendida</div>
+      <div class="dm-sub" id="dm-subtitle">Registro de equipos solicitados sin stock disponible</div>
+    </div>
+    <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;">
+      <button onclick="dmCargar()" style="background:var(--surface2);border:1px solid var(--border);color:var(--muted);padding:.35rem .75rem;border-radius:7px;cursor:pointer;font-family:inherit;font-size:.76rem;">🔄 Actualizar</button>
+      <button onclick="dmExportarExcel()" style="background:linear-gradient(135deg,#16a34a,#22c55e);color:#fff;border:none;padding:.38rem .85rem;border-radius:7px;cursor:pointer;font-family:inherit;font-size:.78rem;font-weight:600;">📥 Exportar Excel</button>
+      <button onclick="dmReporteSemanal()" style="background:linear-gradient(135deg,#7c3aed,#a78bfa);color:#fff;border:none;padding:.38rem .85rem;border-radius:7px;cursor:pointer;font-family:inherit;font-size:.78rem;font-weight:600;">📊 Reporte Semanal</button>
+    </div>
+  </div>
+
+  <!-- Formulario de registro — UX rápida: Tab/Enter navega, Enter en cantidad registra -->
+  <div class="dm-card">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem;">
+      <div class="dm-section-title" style="margin-bottom:0;">⚡ Registrar Solicitud No Atendida</div>
+      <div style="font-size:.68rem;color:var(--muted);">💡 Tab o Enter para avanzar · Enter en Cant. registra</div>
+    </div>
+    <div class="dm-form-grid">
+      <!-- Modelo con autocomplete -->
+      <div class="dm-field">
+        <label>Modelo solicitado</label>
+        <div class="dm-autocomplete">
+          <input type="text" id="dm-modelo" placeholder="Escribí el modelo..." autocomplete="off"
+            style="width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:.5rem .7rem;border-radius:8px;font-family:inherit;font-size:.88rem;font-weight:600;"
+            oninput="dmAcBuscar(this.value)"
+            onkeydown="dmAcKeydown(event)"
+            onfocus="dmAcBuscar(this.value)">
+          <div class="dm-autocomplete-list" id="dm-ac-list"></div>
+        </div>
+      </div>
+      <!-- Tienda como 3 botones rápidos -->
+      <div class="dm-field">
+        <label>Tienda</label>
+        <div class="dm-tienda-btns" id="dm-tienda-btns">
+          <button class="dm-t-btn" onclick="dmSelTienda('San José')" id="dm-t-sj" type="button" onkeydown="if(event.key==='Enter'||event.key==='Tab'){event.preventDefault();document.getElementById('dm-cantidad').focus();}">San José</button>
+          <button class="dm-t-btn" onclick="dmSelTienda('Liberia')" id="dm-t-lb" type="button" onkeydown="if(event.key==='Enter'||event.key==='Tab'){event.preventDefault();document.getElementById('dm-cantidad').focus();}">Liberia</button>
+          <button class="dm-t-btn" onclick="dmSelTienda('Pérez Zeledón')" id="dm-t-pz" type="button" onkeydown="if(event.key==='Enter'||event.key==='Tab'){event.preventDefault();document.getElementById('dm-cantidad').focus();}">P. Zeledón</button>
+        </div>
+        <input type="hidden" id="dm-tienda" value="">
+      </div>
+      <!-- Cantidad: Enter registra directo -->
+      <div class="dm-field">
+        <label>Cantidad</label>
+        <input type="number" id="dm-cantidad" placeholder="1" min="1" value="1"
+          style="width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:.5rem .7rem;border-radius:8px;font-family:inherit;font-size:.95rem;font-weight:700;text-align:center;"
+          onkeydown="if(event.key==='Enter'){event.preventDefault();dmRegistrar();}">
+      </div>
+      <!-- Precio auto-relleno desde catálogo (editable) -->
+      <div class="dm-field">
+        <label>Precio China Marítimo (USD)</label>
+        <input type="number" id="dm-precio" placeholder="Auto" min="0" step="0.01"
+          style="width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:.5rem .7rem;border-radius:8px;font-family:inherit;font-size:.85rem;"
+          onkeydown="if(event.key==='Enter'){event.preventDefault();dmRegistrar();}">
+        <div id="dm-precio-hint" style="font-size:.63rem;color:var(--muted);margin-top:2px;"></div>
+      </div>
+      <div class="dm-field">
+        <label>&nbsp;</label>
+        <button class="dm-btn-reg" onclick="dmRegistrar()">➕ Registrar</button>
+      </div>
+    </div>
+    <div id="dm-form-msg" style="font-size:.75rem;margin-top:.5rem;font-weight:600;"></div>
+  </div>
+
+  <!-- KPI Stats -->
+  <div class="dm-stats-row" id="dm-stats">
+    <div class="dm-stat">
+      <div class="dm-stat-val" id="dm-kpi-total" style="color:var(--accent);">—</div>
+      <div class="dm-stat-lbl">Solicitudes</div>
+    </div>
+    <div class="dm-stat">
+      <div class="dm-stat-val" id="dm-kpi-uds" style="color:var(--blue);">—</div>
+      <div class="dm-stat-lbl">Unidades perdidas</div>
+    </div>
+    <div class="dm-stat">
+      <div class="dm-stat-val" id="dm-kpi-usd" style="color:var(--success);">—</div>
+      <div class="dm-stat-lbl">$ Venta perdida</div>
+    </div>
+    <div class="dm-stat">
+      <div class="dm-stat-val" id="dm-kpi-modelos" style="color:var(--gold);">—</div>
+      <div class="dm-stat-lbl">Modelos únicos</div>
+    </div>
+  </div>
+
+  <!-- Filtros + Top modelos -->
+  <div style="display:grid;grid-template-columns:2fr 1fr;gap:1rem;margin-bottom:1rem;">
+
+    <!-- Tabla principal -->
+    <div class="dm-card" style="margin-bottom:0;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.8rem;flex-wrap:wrap;gap:.5rem;">
+        <div class="dm-section-title" style="margin-bottom:0;">📋 Registros</div>
+        <div class="dm-filters" style="margin-bottom:0;">
+          <select id="dm-f-tienda" onchange="dmRender()">
+            <option value="">Todas las tiendas</option>
+            <option>San José</option>
+            <option>Liberia</option>
+            <option>Pérez Zeledón</option>
+          </select>
+          <select id="dm-f-semana" onchange="dmRender()">
+            <option value="">Todas las fechas</option>
+            <option value="7">Últimos 7 días</option>
+            <option value="30">Últimos 30 días</option>
+            <option value="90">Últimos 90 días</option>
+          </select>
+          <input type="text" id="dm-f-buscar" placeholder="🔍 Buscar modelo..." oninput="dmRender()" style="min-width:150px;max-width:200px;">
+        </div>
+      </div>
+      <div class="dm-tbl-wrap" style="max-height:350px;overflow-y:auto;">
+        <table class="dm-tbl">
+          <thead>
+            <tr>
+              <th>Fecha</th><th>Modelo</th><th>Tienda</th><th>Asesor</th><th>Cant.</th><th>Precio</th><th>Total</th><th></th>
+            </tr>
+          </thead>
+          <tbody id="dm-tbody"></tbody>
+        </table>
+        <div id="dm-empty" class="dm-empty" style="display:none;">📭 Sin registros para los filtros seleccionados</div>
+      </div>
+    </div>
+
+    <!-- Top modelos -->
+    <div class="dm-card" style="margin-bottom:0;">
+      <div class="dm-section-title">🏆 Top Modelos Demandados</div>
+      <div id="dm-top-list">
+        <div class="dm-empty" style="padding:1.5rem .5rem;">Sin datos aún</div>
+      </div>
+    </div>
+
+  </div>
+
+</div>
+<!-- /modDemanda -->
 
 <!-- ADMIN MODAL -->
 <div class="overlay" id="adminOverlay">
@@ -2642,9 +2836,11 @@ var SB_KEY_P = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJ
 function setModulo(mod) {
   var cot = document.getElementById('modCotizador');
   var ped = document.getElementById('modPedidos');
+  var dem = document.getElementById('modDemanda');
   if(cot) cot.style.display = mod==='cotizador' ? '' : 'none';
   if(ped) ped.style.display = mod==='pedidos' ? '' : 'none';
-  var tabs = ['cotizador','pedidos'];
+  if(dem) dem.style.display = mod==='demanda' ? '' : 'none';
+  var tabs = ['cotizador','pedidos','demanda'];
   tabs.forEach(function(m) {
     var btn = document.getElementById('modTab-'+m);
     if(!btn) return;
@@ -2653,6 +2849,7 @@ function setModulo(mod) {
     btn.style.boxShadow = m===mod ? '0 1px 4px rgba(0,0,0,.15)' : 'none';
   });
   if(mod==='pedidos') cargarPedidos();
+  if(mod==='demanda') dmCargar();
 }
 
 function _sbHeaders() {
@@ -2897,6 +3094,378 @@ async function confirmarEntrega(id, checked) {
     renderPedidos();
     mostrarToast('✅ Entrega confirmada');
   } catch(e) { mostrarToast('Error: '+e.message,'#f87171'); }
+}
+
+// ══════════════════════════════════════════════════
+//  MÓDULO DEMANDA — Solicitudes no atendidas
+// ══════════════════════════════════════════════════
+var _DM_URL = 'https://loldcmqaklfpmvnxkxbu.supabase.co';
+var _dmData = [];       // cache local de registros
+var _dmAcIdx = -1;      // índice seleccionado en autocomplete
+var _dmTienda = '';     // tienda seleccionada
+
+function _dmHeaders(useSvc) {
+  var key = useSvc ? _SB_SVC : _SB_KEY;
+  return { 'Content-Type':'application/json', 'apikey':key, 'Authorization':'Bearer '+key };
+}
+
+// ── Tienda quick-select ─────────────────────────
+function dmSelTienda(nombre) {
+  _dmTienda = nombre;
+  var ids = {'San José':'dm-t-sj','Liberia':'dm-t-lb','Pérez Zeledón':'dm-t-pz'};
+  Object.values(ids).forEach(function(id){ var b=document.getElementById(id); if(b) b.classList.remove('active'); });
+  var btn = document.getElementById(ids[nombre]);
+  if(btn) btn.classList.add('active');
+  var inp = document.getElementById('dm-tienda');
+  if(inp) inp.value = nombre;
+  // Foco a cantidad
+  setTimeout(function(){ var c=document.getElementById('dm-cantidad'); if(c){c.focus();c.select();} }, 50);
+}
+
+// ── Autocomplete modelo ─────────────────────────
+function dmAcBuscar(q) {
+  var list = document.getElementById('dm-ac-list');
+  if(!list) return;
+  q = (q||'').trim().toUpperCase();
+  if(q.length < 1) { list.classList.remove('open'); list.innerHTML=''; _dmAcIdx=-1; return; }
+  // Buscar en el catálogo global de productos — con ranking por relevancia
+  var prods = (typeof PRODUCTS !== 'undefined' ? PRODUCTS : []);
+  // También buscar en cualquier array global que tenga modelos (sku, codigo, etc.)
+  var allItems = prods;
+  var tier1 = []; // modelo empieza con el término
+  var tier2 = []; // modelo contiene el término (no al inicio)
+  var tier3 = []; // descripción/categoría contiene el término
+  for(var i=0;i<allItems.length;i++){
+    var p = allItems[i];
+    if(!p) continue;
+    // Soportar diferentes estructuras: model/sku/code/name/nombre
+    var modelo = (p.model||p.sku||p.code||p.name||p.nombre||'').toUpperCase();
+    if(!modelo) continue;
+    var desc = (p.desc||p.description||p.descripcion||p.cat||p.category||p.sub||'').toUpperCase();
+    var idxM = modelo.indexOf(q);
+    if(idxM === 0) { tier1.push(p); }
+    else if(idxM > 0) { tier2.push(p); }
+    else if(desc.indexOf(q) >= 0) { tier3.push(p); }
+  }
+  var matches = tier1.concat(tier2).concat(tier3).slice(0, 20);
+  if(!matches.length) {
+    list.innerHTML = '<div style="padding:.6rem 1rem;color:var(--muted);font-size:.8rem;">Sin resultados para "'+_dmEsc(q)+'"</div>';
+    list.classList.add('open');
+    _dmAcIdx = -1;
+    return;
+  }
+  _dmAcIdx = -1;
+  var qOrig = q; // para resaltar
+  list.innerHTML = matches.map(function(p,i){
+    var modelo = p.model||p.sku||p.code||p.name||p.nombre||'';
+    var precio = dmPrecioMaritimo(p);
+    var precioStr = precio > 0 ? '<span class="dm-ac-price">$'+precio.toFixed(2)+'</span>' : '';
+    var catStr = (p.cat||p.category||p.sub||p.description||p.descripcion||'');
+    // Resaltar el término buscado en el modelo
+    var modeloHtml = _dmEsc(modelo).replace(new RegExp('('+_dmEscReg(qOrig)+')','gi'),'<mark style="background:var(--accent);color:#fff;border-radius:2px;padding:0 2px;">$1</mark>');
+    return '<div class="dm-ac-item" data-idx="'+i+'" data-model="'+_dmEsc(modelo)+'" data-precio="'+precio+'" onclick="dmAcSeleccionar(this)">'+
+      '<div class="dm-ac-model">'+modeloHtml+'</div>'+
+      '<div style="display:flex;justify-content:space-between;align-items:center;gap:.5rem;">'+
+        '<span class="dm-ac-meta">'+_dmEsc(catStr)+'</span>'+
+        precioStr+
+      '</div>'+
+    '</div>';
+  }).join('');
+  list.classList.add('open');
+}
+
+function dmPrecioMaritimo(p) {
+  // Intentar obtener precio base China marítimo del producto del catálogo
+  // Los precios en el cotizador vienen de p.price (precio lista Hikvision USD)
+  // Marítimo = precio lista × factor marítimo (sin margen de venta)
+  // El cotizador usa: precioVenta = price * (1 + margin) * routeFactor * (1 + arancel)
+  // Para referencia de pérdida usamos precio lista sin margen como base
+  if(!p) return 0;
+  var base = p.price || p.lista || 0;
+  if(!base) return 0;
+  // Factor marítimo China es el más bajo — usar el precio lista directo como referencia
+  // ya que es lo que Sekunet paga en FOB China antes de márgenes
+  return Math.round(base * 100) / 100;
+}
+
+function dmAcKeydown(e) {
+  var list = document.getElementById('dm-ac-list');
+  if(!list || !list.classList.contains('open')) {
+    if(e.key==='Tab'||e.key==='ArrowDown') { dmAcBuscar(e.target.value); }
+    return;
+  }
+  var items = list.querySelectorAll('.dm-ac-item');
+  if(e.key==='ArrowDown'){
+    e.preventDefault();
+    _dmAcIdx = Math.min(_dmAcIdx+1, items.length-1);
+    items.forEach(function(el,i){ el.classList.toggle('selected', i===_dmAcIdx); });
+    if(items[_dmAcIdx]) items[_dmAcIdx].scrollIntoView({block:'nearest'});
+  } else if(e.key==='ArrowUp'){
+    e.preventDefault();
+    _dmAcIdx = Math.max(_dmAcIdx-1, -1);
+    items.forEach(function(el,i){ el.classList.toggle('selected', i===_dmAcIdx); });
+  } else if(e.key==='Enter'){
+    e.preventDefault();
+    if(_dmAcIdx >= 0 && items[_dmAcIdx]) { dmAcSeleccionar(items[_dmAcIdx]); }
+    else { list.classList.remove('open'); document.getElementById('dm-tienda-btns') && document.getElementById('dm-t-sj').focus(); }
+  } else if(e.key==='Escape'){
+    list.classList.remove('open');
+  } else if(e.key==='Tab'){
+    list.classList.remove('open');
+    if(_dmAcIdx >= 0 && items[_dmAcIdx]) dmAcSeleccionar(items[_dmAcIdx]);
+  }
+}
+
+function dmAcSeleccionar(el) {
+  var model = el.getAttribute('data-model');
+  var precio = parseFloat(el.getAttribute('data-precio')) || 0;
+  var inp = document.getElementById('dm-modelo');
+  if(inp) inp.value = model;
+  var list = document.getElementById('dm-ac-list');
+  if(list) { list.classList.remove('open'); list.innerHTML=''; }
+  _dmAcIdx = -1;
+  // Auto-rellenar precio marítimo China
+  var pInp = document.getElementById('dm-precio');
+  var hint = document.getElementById('dm-precio-hint');
+  if(pInp) {
+    if(precio > 0) {
+      pInp.value = precio.toFixed(2);
+      pInp.classList.add('dm-precio-ro');
+      if(hint) hint.textContent = '✅ Precio lista Hikvision · editable si querés ajustar';
+    } else {
+      pInp.value = '';
+      pInp.classList.remove('dm-precio-ro');
+      if(hint) hint.textContent = '⚠️ Ingresá el precio manualmente';
+    }
+  }
+  // Cerrar lista y mover foco a los botones de tienda
+  setTimeout(function(){ var b=document.getElementById('dm-t-sj'); if(b) b.focus(); }, 60);
+}
+
+// Cerrar autocomplete al click fuera
+document.addEventListener('click', function(e){
+  if(!e.target.closest('.dm-autocomplete')) {
+    var list = document.getElementById('dm-ac-list');
+    if(list) { list.classList.remove('open'); list.innerHTML=''; }
+  }
+});
+
+// ── Carga de datos ──────────────────────────────
+async function dmCargar() {
+  if (!usuarioActivo) return;
+  var tbody = document.getElementById('dm-tbody');
+  if(tbody) tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:1.5rem;">⏳ Cargando...</td></tr>';
+  try {
+    var r = await fetch(_DM_URL + '/rest/v1/demanda_perdida?order=created_at.desc&limit=500', {
+      headers: _dmHeaders(false)
+    });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    _dmData = await r.json();
+    dmRender();
+  } catch(e) {
+    if(tbody) tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--accent);padding:1.5rem;">⚠️ Error: ' + e.message + '</td></tr>';
+  }
+}
+
+// ── Filtrar ─────────────────────────────────────
+function dmFiltrar() {
+  var tienda = (document.getElementById('dm-f-tienda')||{}).value || '';
+  var semana = (document.getElementById('dm-f-semana')||{}).value || '';
+  var buscar = ((document.getElementById('dm-f-buscar')||{}).value || '').toLowerCase().trim();
+  var ahora = Date.now();
+  return _dmData.filter(function(r) {
+    if(tienda && r.tienda !== tienda) return false;
+    if(semana) { var dias=parseInt(semana); if(ahora-new Date(r.created_at).getTime()>dias*86400000) return false; }
+    if(buscar && !(r.modelo||'').toLowerCase().includes(buscar)) return false;
+    return true;
+  });
+}
+
+// ── Render tabla ────────────────────────────────
+function dmRender() {
+  var tbody = document.getElementById('dm-tbody');
+  var emptyEl = document.getElementById('dm-empty');
+  if(!tbody) return;
+  var datos = dmFiltrar();
+  dmActualizarKPIs(datos);
+  dmActualizarTop(datos);
+  if(!datos.length) {
+    tbody.innerHTML = '';
+    if(emptyEl) emptyEl.style.display = '';
+    return;
+  }
+  if(emptyEl) emptyEl.style.display = 'none';
+  var esAdmin = _esAdminEmail();
+  tbody.innerHTML = datos.map(function(r) {
+    var fecha = new Date(r.created_at);
+    var fechaStr = fecha.toLocaleDateString('es-CR',{day:'2-digit',month:'2-digit',year:'numeric'});
+    var total = (r.cantidad||0)*(r.precio_estimado||0);
+    var totalStr = total>0?'$'+total.toFixed(2):'—';
+    var precioStr = r.precio_estimado>0?'$'+Number(r.precio_estimado).toFixed(2):'—';
+    var delBtn = esAdmin?'<button class="dm-btn-del" onclick="dmEliminar('+r.id+')" title="Eliminar">🗑</button>':'';
+    return '<tr>'+
+      '<td style="font-size:.75rem;color:var(--muted);white-space:nowrap;">'+fechaStr+'</td>'+
+      '<td style="font-weight:600;font-size:.82rem;">'+_dmEsc(r.modelo)+'</td>'+
+      '<td><span class="dm-badge-tienda">'+_dmEsc(r.tienda)+'</span></td>'+
+      '<td style="font-size:.76rem;color:var(--muted);">'+_dmEsc(r.asesor_nombre||r.email||'—')+'</td>'+
+      '<td style="font-family:\'DM Mono\',monospace;text-align:center;font-weight:700;">'+Number(r.cantidad).toLocaleString()+'</td>'+
+      '<td style="font-family:\'DM Mono\',monospace;color:var(--muted);">'+precioStr+'</td>'+
+      '<td style="font-family:\'DM Mono\',monospace;color:var(--success);font-weight:700;">'+totalStr+'</td>'+
+      '<td>'+delBtn+'</td>'+
+    '</tr>';
+  }).join('');
+}
+
+function _dmEsc(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function _dmEscReg(s){ return (s||'').replace(/[.*+?^${}()|[\]\\]/g,'\\$&'); }
+
+// ── KPIs ────────────────────────────────────────
+function dmActualizarKPIs(datos) {
+  var total=datos.length;
+  var uds=datos.reduce(function(a,r){return a+(Number(r.cantidad)||0);},0);
+  var usd=datos.reduce(function(a,r){return a+(Number(r.cantidad)||0)*(Number(r.precio_estimado)||0);},0);
+  var modelos=new Set(datos.map(function(r){return(r.modelo||'').toLowerCase().trim();})).size;
+  var e=function(id,v){var el=document.getElementById(id);if(el)el.textContent=v;};
+  e('dm-kpi-total',total.toLocaleString());
+  e('dm-kpi-uds',uds.toLocaleString());
+  e('dm-kpi-usd',usd>0?'$'+usd.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}):'$0.00');
+  e('dm-kpi-modelos',modelos.toLocaleString());
+}
+
+// ── Top modelos ─────────────────────────────────
+function dmActualizarTop(datos) {
+  var topEl=document.getElementById('dm-top-list');
+  if(!topEl) return;
+  var map={};
+  datos.forEach(function(r){
+    var m=(r.modelo||'').trim(); if(!m) return;
+    if(!map[m]) map[m]={modelo:m,uds:0,usd:0};
+    map[m].uds+=Number(r.cantidad)||0;
+    map[m].usd+=(Number(r.cantidad)||0)*(Number(r.precio_estimado)||0);
+  });
+  var lista=Object.values(map).sort(function(a,b){return b.uds-a.uds;}).slice(0,10);
+  if(!lista.length){topEl.innerHTML='<div class="dm-empty" style="padding:1.5rem .5rem;">Sin datos aún</div>';return;}
+  var maxUds=lista[0].uds||1;
+  topEl.innerHTML=lista.map(function(item,i){
+    var pct=Math.round((item.uds/maxUds)*100);
+    var rank=['🥇','🥈','🥉'][i]||(i+1)+'.';
+    return '<div class="dm-top-item2">'+
+      '<span style="font-size:.8rem;width:22px;text-align:center;">'+rank+'</span>'+
+      '<span class="dm-top-bar-wrap"><span class="dm-top-bar" style="width:'+pct+'%"></span></span>'+
+      '<span style="font-size:.72rem;font-weight:600;flex:2;margin:0 .5rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="'+_dmEsc(item.modelo)+'">'+_dmEsc(item.modelo)+'</span>'+
+      '<span style="font-size:.7rem;font-weight:700;color:var(--accent);white-space:nowrap;">'+item.uds+' uds</span>'+
+    '</div>';
+  }).join('');
+}
+
+// ── Registrar ───────────────────────────────────
+async function dmRegistrar() {
+  var modelo = (document.getElementById('dm-modelo')||{}).value || '';
+  var tienda = _dmTienda || (document.getElementById('dm-tienda')||{}).value || '';
+  var cantidad = parseInt((document.getElementById('dm-cantidad')||{}).value) || 0;
+  var precio = parseFloat((document.getElementById('dm-precio')||{}).value) || 0;
+  var msgEl = document.getElementById('dm-form-msg');
+  function err(t){if(msgEl){msgEl.style.color='#f87171';msgEl.textContent=t;}}
+  if(!modelo.trim()){err('⚠️ Ingresá el modelo solicitado.');document.getElementById('dm-modelo').focus();return;}
+  if(!tienda){err('⚠️ Seleccioná la tienda (San José / Liberia / P. Zeledón).');return;}
+  if(cantidad<1){err('⚠️ Cantidad mínima: 1.');document.getElementById('dm-cantidad').focus();return;}
+  if(msgEl){msgEl.style.color='var(--muted)';msgEl.textContent='⏳ Guardando...';}
+  var asesorNombre = '';
+  if(usuarioActivo){
+    asesorNombre = (usuarioActivo.user_metadata&&usuarioActivo.user_metadata.full_name)
+      ? usuarioActivo.user_metadata.full_name
+      : (usuarioActivo.email||'').split('@')[0];
+  }
+  var payload = {
+    modelo: modelo.trim().toUpperCase(),
+    tienda: tienda,
+    cantidad: cantidad,
+    precio_estimado: precio>0?precio:null,
+    email: usuarioActivo?usuarioActivo.email:null,
+    asesor_nombre: asesorNombre||null
+  };
+  try {
+    var r = await fetch(_DM_URL+'/rest/v1/demanda_perdida',{
+      method:'POST', mode:'cors',
+      headers:Object.assign(_dmHeaders(true),{'Prefer':'return=minimal'}),
+      body:JSON.stringify(payload)
+    });
+    if(!r.ok) throw new Error('HTTP '+r.status+' — '+await r.text());
+    if(msgEl){msgEl.style.color='#4ade80';msgEl.textContent='✅ Registrado — '+modelo.trim().toUpperCase()+' · '+tienda+' · '+cantidad+' uds';}
+    // Reset formulario manteniendo tienda seleccionada para registros rápidos consecutivos
+    var mInp=document.getElementById('dm-modelo'); if(mInp){mInp.value='';mInp.focus();}
+    var cInp=document.getElementById('dm-cantidad'); if(cInp) cInp.value='1';
+    var pInp=document.getElementById('dm-precio'); if(pInp){pInp.value='';pInp.classList.remove('dm-precio-ro');}
+    var hint=document.getElementById('dm-precio-hint'); if(hint) hint.textContent='';
+    var acList=document.getElementById('dm-ac-list'); if(acList){acList.classList.remove('open');acList.innerHTML='';}
+    setTimeout(function(){if(msgEl)msgEl.textContent='';},4000);
+    dmCargar();
+  } catch(e) {
+    if(msgEl){msgEl.style.color='#f87171';msgEl.textContent='❌ Error: '+e.message;}
+  }
+}
+
+// ── Eliminar ────────────────────────────────────
+async function dmEliminar(id) {
+  if(!_esAdminEmail()) return;
+  if(!confirm('¿Eliminar este registro?')) return;
+  try {
+    await fetch(_DM_URL+'/rest/v1/demanda_perdida?id=eq.'+id,{method:'DELETE',mode:'cors',headers:_dmHeaders(true)});
+    _dmData=_dmData.filter(function(r){return r.id!==id;});
+    dmRender();
+    mostrarToast('🗑 Registro eliminado');
+  } catch(e){mostrarToast('Error: '+e.message,'#f87171');}
+}
+
+// ── Exportar Excel (CSV con BOM) ─────────────────
+function dmExportarExcel() {
+  var datos=dmFiltrar();
+  if(!datos.length){mostrarToast('⚠️ Sin datos para exportar','#f59e0b');return;}
+  var bom='﻿';
+  var headers=['Fecha','Modelo','Tienda','Asesor','Cantidad','Precio Lista (USD)','Total Pérdida (USD)'];
+  var rows=datos.map(function(r){
+    var fecha=new Date(r.created_at).toLocaleDateString('es-CR');
+    var total=(Number(r.cantidad)||0)*(Number(r.precio_estimado)||0);
+    return [fecha,r.modelo||'',r.tienda||'',r.asesor_nombre||r.email||'',
+      Number(r.cantidad)||0,
+      r.precio_estimado!=null?Number(r.precio_estimado).toFixed(2):'',
+      total>0?total.toFixed(2):''
+    ].map(function(v){return '"'+String(v).replace(/"/g,'""')+'"';}).join(',');
+  });
+  var csv=bom+headers.join(',')+'\n'+rows.join('\n');
+  var blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
+  var url=URL.createObjectURL(blob);
+  var a=document.createElement('a');
+  var hoy=new Date().toISOString().slice(0,10);
+  a.href=url; a.download='Demanda_Sekunet_'+hoy+'.csv';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  mostrarToast('📥 Descargando CSV...');
+}
+
+// ── Reporte semanal (copia al portapapeles) ──────
+function dmReporteSemanal() {
+  var ahora=Date.now();
+  var semana=_dmData.filter(function(r){return(ahora-new Date(r.created_at).getTime())<=7*86400000;});
+  var uds=semana.reduce(function(a,r){return a+(Number(r.cantidad)||0);},0);
+  var usd=semana.reduce(function(a,r){return a+(Number(r.cantidad)||0)*(Number(r.precio_estimado)||0);},0);
+  var map={};
+  semana.forEach(function(r){var m=(r.modelo||'').trim();if(!m)return;if(!map[m])map[m]={m:m,u:0};map[m].u+=Number(r.cantidad)||0;});
+  var top5=Object.values(map).sort(function(a,b){return b.u-a.u;}).slice(0,5);
+  var desde=new Date(ahora-7*86400000).toLocaleDateString('es-CR');
+  var hasta=new Date().toLocaleDateString('es-CR');
+  var lineas=top5.map(function(t,i){return (i+1)+'. '+t.m+' — '+t.u+' uds';}).join('\n');
+  var msg='📊 REPORTE SEMANAL — DEMANDA NO ATENDIDA\n'+
+    '══════════════════════════════════════\n'+
+    '📅 Período: '+desde+' al '+hasta+'\n\n'+
+    '📦 Solicitudes: '+semana.length+'\n'+
+    '🔢 Unidades sin atender: '+uds.toLocaleString()+'\n'+
+    '💸 Pérdida estimada: $'+usd.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})+'\n\n'+
+    '🏆 TOP 5 MODELOS:\n'+(lineas||'Sin registros esta semana')+'\n\n'+
+    'Sekunet S.A. · Distribuidor Mayorista Hikvision';
+  if(navigator.clipboard){
+    navigator.clipboard.writeText(msg).then(function(){mostrarToast('📋 Reporte copiado al portapapeles');});
+  } else { alert(msg); }
 }
 
 async function confirmarFactura(id, checked) {
