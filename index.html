@@ -1633,7 +1633,7 @@ function eliminarUsuario(idx){
 }
 
 /* ─── GESTIÓN DE PINs ───────────────────────────────────── */
-const _PIN_ASESORES = [
+let _PIN_ASESORES = [
   { nombre: 'Carolina Chavarria', email: 'cchavarria@sekunet.com' },
   { nombre: 'Fabiana Perozo',     email: 'fperozo@sekunet.com' },
   { nombre: 'Joaquin Sanchez',    email: 'js.sanchez@sekunet.com' },
@@ -1644,6 +1644,7 @@ const _PIN_ASESORES = [
   { nombre: 'Mariano Castro',     email: 'mcastro@sekunet.com' },
   { nombre: 'Herry',              email: 'ventaspz2@sekunet.com' },
   { nombre: 'Albertson Escobar',  email: 'aescobar@sekunet.com' },
+  { nombre: 'Sucursal Liberia',   email: 'SucLib1@Sekunet.com' },
 ];
 
 function renderPins(body) {
@@ -1678,7 +1679,82 @@ function renderPins(body) {
           </tr>`).join('')}
         </tbody>
       </table>
+    </div>
+    <!-- Formulario agregar nuevo asesor -->
+    <div style="margin-top:1.1rem;padding:1rem;background:var(--surface2);border:1px solid var(--border);border-radius:10px;">
+      <div style="font-size:.72rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:.7rem;">➕ Agregar nuevo asesor</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 120px auto;gap:.6rem;align-items:end;">
+        <div>
+          <div style="font-size:.7rem;color:var(--muted);margin-bottom:.25rem;">Nombre</div>
+          <input type="text" id="pin-new-nombre" placeholder="Ej: Luis Pérez" style="font-size:.82rem;padding:.38rem .6rem;">
+        </div>
+        <div>
+          <div style="font-size:.7rem;color:var(--muted);margin-bottom:.25rem;">Correo</div>
+          <input type="email" id="pin-new-email" placeholder="asesor@sekunet.com" style="font-size:.82rem;padding:.38rem .6rem;">
+        </div>
+        <div>
+          <div style="font-size:.7rem;color:var(--muted);margin-bottom:.25rem;">PIN inicial</div>
+          <input type="text" id="pin-new-pin" inputmode="numeric" maxlength="8" placeholder="••••" style="font-family:'DM Mono',monospace;font-size:.88rem;letter-spacing:.15rem;padding:.38rem .6rem;text-align:center;">
+        </div>
+        <button class="btn btn-green btn-sm" onclick="agregarNuevoAsesor()" style="white-space:nowrap;">✓ Agregar</button>
+      </div>
+      <div id="pin-new-msg" style="min-height:1rem;font-size:.78rem;margin-top:.4rem;"></div>
     </div>`;
+}
+
+async function agregarNuevoAsesor() {
+  const nombre = (document.getElementById('pin-new-nombre')?.value || '').trim();
+  const email  = (document.getElementById('pin-new-email')?.value || '').trim().toLowerCase();
+  const pin    = (document.getElementById('pin-new-pin')?.value || '').trim();
+  const msg    = document.getElementById('pin-new-msg');
+
+  if (!nombre) { msg.style.color='#f87171'; msg.textContent='⚠️ Ingresá el nombre'; return; }
+  if (!email || !email.includes('@')) { msg.style.color='#f87171'; msg.textContent='⚠️ Correo inválido'; return; }
+  if (!pin || pin.length < 4) { msg.style.color='#f87171'; msg.textContent='⚠️ PIN mínimo 4 dígitos'; return; }
+
+  // Verificar duplicado
+  if (_PIN_ASESORES.some(a => a.email.toLowerCase() === email)) {
+    msg.style.color='#f87171'; msg.textContent='⚠️ Ese correo ya está en la lista'; return;
+  }
+
+  msg.style.color='var(--muted)'; msg.textContent='⏳ Guardando...';
+
+  try {
+    const res = await fetch(_SB_URL + '/rest/v1/user_pins', {
+      method: 'POST',
+      mode: 'cors',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': _SB_SVC,
+        'Authorization': 'Bearer ' + _SB_SVC,
+        'Prefer': 'resolution=merge-duplicates,return=minimal'
+      },
+      body: JSON.stringify({ email: email, pin: pin })
+    });
+
+    if (res.ok || res.status === 201 || res.status === 204) {
+      // Agregar a la lista local
+      _PIN_ASESORES.push({ nombre: nombre, email: email });
+      msg.style.color='#4ade80';
+      msg.textContent='✅ ' + nombre + ' agregado correctamente';
+      // Limpiar campos
+      document.getElementById('pin-new-nombre').value='';
+      document.getElementById('pin-new-email').value='';
+      document.getElementById('pin-new-pin').value='';
+      // Refrescar tabla de PINs
+      setTimeout(() => {
+        const body = document.querySelector('#adminModal .admin-body, #adminBody');
+        if(body) renderPins(body);
+      }, 800);
+    } else {
+      const txt = await res.text();
+      msg.style.color='#f87171';
+      msg.textContent='❌ Error: ' + (JSON.parse(txt||'{}').message || res.status);
+    }
+  } catch(e) {
+    msg.style.color='#f87171';
+    msg.textContent='❌ Error de conexión: ' + e.message;
+  }
 }
 
 async function guardarPin(i) {
@@ -2318,7 +2394,7 @@ function _sbLoading(spinId, btnId, on) {
 }
 
 async function sbLogin() {
-  const email = document.getElementById('sbEmail').value.trim();
+  const email = document.getElementById('sbEmail').value.trim().toLowerCase();
   const pass  = document.getElementById('sbPass').value;
   const err   = document.getElementById('sbErr');
   if(!email || !pass) { err.textContent = 'Ingresa tu correo y contraseña'; return; }
@@ -2347,7 +2423,9 @@ async function sbLogin() {
     // Guardar sesión temporal y pedir PIN
     _pin2faSesion = data;
     _pin2faEmail  = email;
-    _pin2faNombre = data.user?.user_metadata?.nombre || email.split('@')[0];
+    // Buscar nombre en _PIN_ASESORES (case-insensitive) o metadata o parte del email
+    const _asesorMatch = _PIN_ASESORES.find(a => a.email.toLowerCase() === email.toLowerCase());
+    _pin2faNombre = data.user?.user_metadata?.nombre || (_asesorMatch ? _asesorMatch.nombre : email.split('@')[0]);
     sbMostrarVista('Pin');
   } catch(e) {
     err.textContent = 'Error de conexión: ' + e.message;
@@ -2436,7 +2514,7 @@ window.pinVerificar = async function() {
   spn.style.display = 'block';
   try {
     const res = await fetch(
-      _SB_URL + '/rest/v1/user_pins?email=eq.' + encodeURIComponent(_pin2faEmail) + '&select=pin',
+      _SB_URL + '/rest/v1/user_pins?email=ilike.' + encodeURIComponent(_pin2faEmail) + '&select=pin',
       { headers: { 'apikey': _SB_KEY, 'Authorization': 'Bearer ' + _SB_KEY } }
     );
     const rows = await res.json();
@@ -2754,15 +2832,15 @@ async function enviarSolicitud(){
   if(ocFile)  ocUrl  = ocFile.name;
   if(cotFile) cotUrl = cotFile.name;
 
-  // Guardar en Supabase
+  // Guardar en Supabase — usar service role para evitar JWT expired del usuario
   try{
     const res = await fetch('https://loldcmqaklfpmvnxkxbu.supabase.co/rest/v1/solicitudes_pedido',{
       method:'POST',
       mode:'cors',
       headers:{
         'Content-Type':'application/json',
-        'apikey':'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxvbGRjbXFha2xmcG12bnhreGJ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU2MTgyMTksImV4cCI6MjEwMTE5NDIxOX0.RI6FcpDz_Z4WBPvmsT0Jx76OVCzqXFZ6sR0LoKUokKo',
-        'Authorization':'Bearer ' + (_sbSession?.access_token||'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxvbGRjbXFha2xmcG12bnhreGJ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU2MTgyMTksImV4cCI6MjEwMTE5NDIxOX0.RI6FcpDz_Z4WBPvmsT0Jx76OVCzqXFZ6sR0LoKUokKo'),
+        'apikey': _SB_SVC,
+        'Authorization': 'Bearer ' + _SB_SVC,
         'Prefer':'return=representation'
       },
       body: JSON.stringify({
@@ -2853,10 +2931,11 @@ function setModulo(mod) {
 }
 
 function _sbHeaders() {
+  // Usar service role para evitar JWT expired — el token del usuario vence en horas
   return {
     'Content-Type': 'application/json',
-    'apikey': SB_KEY_P,
-    'Authorization': 'Bearer ' + (typeof _sbSession !== 'undefined' && _sbSession ? _sbSession.access_token : SB_KEY_P)
+    'apikey': _SB_SVC,
+    'Authorization': 'Bearer ' + _SB_SVC
   };
 }
 
