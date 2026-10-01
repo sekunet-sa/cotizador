@@ -3330,8 +3330,9 @@ async function dmCargar() {
   var tbody = document.getElementById('dm-tbody');
   if(tbody) tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:1.5rem;">⏳ Cargando...</td></tr>';
   try {
+    // Admin usa service role para ver TODOS los registros sin filtro RLS
     var r = await fetch(_DM_URL + '/rest/v1/demanda_perdida?order=created_at.desc&limit=500', {
-      headers: _dmHeaders(false)
+      headers: _dmHeaders(_esAdminEmail())
     });
     if (!r.ok) throw new Error('HTTP ' + r.status);
     _dmData = await r.json();
@@ -3446,9 +3447,10 @@ async function dmRegistrar() {
   if(msgEl){msgEl.style.color='var(--muted)';msgEl.textContent='⏳ Guardando...';}
   var asesorNombre = '';
   if(usuarioActivo){
-    asesorNombre = (usuarioActivo.user_metadata&&usuarioActivo.user_metadata.full_name)
-      ? usuarioActivo.user_metadata.full_name
-      : (usuarioActivo.email||'').split('@')[0];
+    // usuarioActivo = {nombre, email} — usar nombre directo
+    asesorNombre = usuarioActivo.nombre
+      || (usuarioActivo.user_metadata&&usuarioActivo.user_metadata.full_name)
+      || (usuarioActivo.email||'').split('@')[0];
   }
   var payload = {
     modelo: modelo.trim().toUpperCase(),
