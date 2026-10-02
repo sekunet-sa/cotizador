@@ -3038,11 +3038,21 @@ function crearTarjetaPedido(p) {
     html += '</div>';
   }
 
-  // Documentos
+  // Documentos — links descargables
   if(p.orden_compra_url || p.cotizacion_url) {
     html += '<div style="display:flex;gap:.5rem;margin-top:.5rem;flex-wrap:wrap;">';
-    if(p.orden_compra_url) html += '<span style="font-size:.71rem;background:rgba(37,99,200,.1);color:#2563c8;padding:.22rem .6rem;border-radius:6px;">📎 OC: '+p.orden_compra_url+'</span>';
-    if(p.cotizacion_url)   html += '<span style="font-size:.71rem;background:rgba(167,139,250,.1);color:#a78bfa;padding:.22rem .6rem;border-radius:6px;">📄 Cot: '+p.cotizacion_url+'</span>';
+    if(p.orden_compra_url) {
+      var ocNombre = p.orden_compra_url.split('/').pop().split('?')[0] || 'OC.pdf';
+      html += '<a href="'+p.orden_compra_url+'" target="_blank" download="'+ocNombre+'"'
+        + ' style="font-size:.71rem;background:rgba(37,99,200,.1);color:#2563c8;padding:.22rem .6rem;border-radius:6px;text-decoration:none;cursor:pointer;"'
+        + ' title="Descargar Orden de Compra">📎 OC: '+ocNombre+'</a>';
+    }
+    if(p.cotizacion_url) {
+      var cotNombre = p.cotizacion_url.split('/').pop().split('?')[0] || 'Cotizacion.pdf';
+      html += '<a href="'+p.cotizacion_url+'" target="_blank" download="'+cotNombre+'"'
+        + ' style="font-size:.71rem;background:rgba(167,139,250,.1);color:#7c3aed;padding:.22rem .6rem;border-radius:6px;text-decoration:none;cursor:pointer;"'
+        + ' title="Descargar Cotización">📄 Cot: '+cotNombre+'</a>';
+    }
     html += '</div>';
   }
 
