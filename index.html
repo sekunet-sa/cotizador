@@ -335,6 +335,7 @@ textarea{resize:vertical;min-height:56px;font-size:.82rem;}
 .ped-step.admin-btn:hover{filter:brightness(1.1);}
 
 </style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 <body>
 
@@ -2012,6 +2013,13 @@ function updateDeliveryFromAdmin(){
 
 function renderPriceEditor(body){
   body.innerHTML=`
+    <div style="display:flex;gap:.6rem;align-items:center;margin-bottom:.7rem;flex-wrap:wrap;">
+      <button class="btn btn-green btn-sm" onclick="document.getElementById('xlsxUploadInput').click()" style="gap:.35rem;display:flex;align-items:center;">
+        📥 Subir lista de precios .xlsx
+      </button>
+      <span id="xlsxUploadStatus" style="font-size:.73rem;color:var(--muted);"></span>
+      <input type="file" id="xlsxUploadInput" accept=".xlsx,.xls" style="display:none;" onchange="importarListaPrecios(this)"/>
+    </div>
     <div class="prod-search-wrap">
       <div class="search-wrap" style="flex:1;">
         <span class="search-ico">🔎</span>
@@ -2026,6 +2034,117 @@ function renderPriceEditor(body){
     </div>
     <div id="priceEditorResults"></div>`;
   renderPriceResults();
+}
+
+function importarListaPrecios(input){
+  const file = input.files[0];
+  if(!file) return;
+  const statusEl = document.getElementById('xlsxUploadStatus');
+  statusEl.textContent = 'Leyendo archivo...';
+  const reader = new FileReader();
+  reader.onload = function(e){
+    try{
+      const wb = XLSX.read(e.target.result, {type:'array'});
+
+      // ── Hoja Distribucion ─────────────────────────────
+      let distUpdated=0, distAdded=0, distSkipped=0;
+      const shDist = wb.Sheets['Distribucion'];
+      if(shDist){
+        const rows = XLSX.utils.sheet_to_json(shDist, {header:0, defval:null});
+        rows.forEach(r=>{
+          const modelo = (r['Modelo del Producto']||'').trim();
+          const fob    = parseFloat(r['FOB China  (USD)']) || null;
+          const exw    = parseFloat(r['EXW Panama  (USD)']) || null;
+          if(!modelo || (fob===null && exw===null)){distSkipped++;return;}
+          const idx = PRODUCTS_BASE.findIndex(p=>p.tipo==='distribucion' && p.n===modelo);
+          if(idx>=0){
+            PRODUCTS_BASE[idx].fob = fob;
+            PRODUCTS_BASE[idx].exw = exw;
+            PRICES[idx] = Object.assign(PRICES[idx]||{}, {fob, exw});
+            distUpdated++;
+          } else {
+            // Modelo nuevo: agregarlo
+            const newIdx = PRODUCTS_BASE.length;
+            PRODUCTS_BASE.push({
+              tipo:'distribucion',
+              marca: (r['Brand']||'HIKVISION').trim(),
+              cat:   (r['Category']||'').trim(),
+              sub:   (r['Sub-category']||r['Product line']||'').trim(),
+              n:     modelo,
+              fob, exw
+            });
+            PRICES[newIdx] = {fob, exw, fob_con:null, exw_con:null, fob_sin:null, exw_sin:null};
+            distAdded++;
+          }
+        });
+      }
+
+      // ── Hoja Proyecto ─────────────────────────────────
+      let proyUpdated=0, proyAdded=0, proySkipped=0;
+      const shProy = wb.Sheets['Proyecto'];
+      if(shProy){
+        const rows = XLSX.utils.sheet_to_json(shProy, {header:0, defval:null});
+        rows.forEach(r=>{
+          const modelo   = (r['Order Product Name']||'').trim();
+          const fob_con  = parseFloat(r['Q4 FOB China  (USD)']) || null;
+          const exw_con  = parseFloat(r['EXW Panama  (USD)']) || null;
+          const fob_sin  = parseFloat(r['FOB China SIN Registro (USD)']) || null;
+          const exw_sin  = parseFloat(r['EXW Panama SIN Registro (USD)']) || null;
+          if(!modelo || (fob_con===null && exw_con===null)){proySkipped++;return;}
+          const idx = PRODUCTS_BASE.findIndex(p=>p.tipo==='proyecto' && p.n===modelo);
+          if(idx>=0){
+            PRODUCTS_BASE[idx].fob_con = fob_con;
+            PRODUCTS_BASE[idx].exw_con = exw_con;
+            PRODUCTS_BASE[idx].fob_sin = fob_sin;
+            PRODUCTS_BASE[idx].exw_sin = exw_sin;
+            PRICES[idx] = Object.assign(PRICES[idx]||{}, {fob_con, exw_con, fob_sin, exw_sin});
+            proyUpdated++;
+          } else {
+            const newIdx = PRODUCTS_BASE.length;
+            PRODUCTS_BASE.push({
+              tipo:'proyecto',
+              marca: (r['Brand']||'HIKVISION').trim(),
+              cat:   (r['Category']||'').trim(),
+              sub:   (r['Product Line']||r['Product Series']||'').trim(),
+              n:     modelo,
+              fob_con, exw_con, fob_sin, exw_sin
+            });
+            PRICES[newIdx] = {fob:null, exw:null, fob_con, exw_con, fob_sin, exw_sin};
+            proyAdded++;
+          }
+        });
+      }
+
+      // ── Hoja Modelo sustituto ─────────────────────────
+      let sustMap = {};
+      const shSust = wb.Sheets['Modelo sustituto'];
+      if(shSust){
+        const rows = XLSX.utils.sheet_to_json(shSust, {header:0, defval:null});
+        rows.forEach(r=>{
+          const old_ = (r['Modelo del Producto']||'').trim();
+          const new_ = (r['Modelo sustituto']||'').trim();
+          if(old_ && new_) sustMap[old_] = new_;
+        });
+      }
+      const sustCount = Object.keys(sustMap).length;
+
+      // ── Actualizar UI ─────────────────────────────────
+      renderTable();
+      renderResults();
+      const resumen =
+        `✅ Distribución: ${distUpdated} actualizados, ${distAdded} nuevos, ${distSkipped} sin precio.  ` +
+        `Proyecto: ${proyUpdated} actualizados, ${proyAdded} nuevos, ${proySkipped} sin precio.  ` +
+        (sustCount ? `Sustitutos: ${sustCount} mapeados.` : '');
+      statusEl.innerHTML = `<span style="color:var(--success);">${resumen}</span>`;
+      mostrarToast('✅ Lista Q4 cargada — ' + (distUpdated+proyUpdated) + ' precios actualizados');
+      input.value='';
+    } catch(err){
+      statusEl.innerHTML = `<span style="color:var(--accent);">❌ Error al leer el archivo: ${err.message}</span>`;
+      console.error('importarListaPrecios:', err);
+    }
+  };
+  reader.onerror = ()=>{ statusEl.textContent = '❌ No se pudo leer el archivo.'; };
+  reader.readAsArrayBuffer(file);
 }
 function renderPriceResults(){
   const q=(document.getElementById('admSearchInput')?.value||'').trim().toLowerCase();
